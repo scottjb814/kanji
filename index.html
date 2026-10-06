@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Glyph origins</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='14' fill='%23A3271F'/><text x='50' y='72' font-size='64' text-anchor='middle' fill='white'>字</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #EEF0EC;
+  --card: #F8F9F7;
+  --ink: #1F2523;
+  --muted: #5E6864;
+  --line: #C9CFCB;
+  --seal: #A3271F;
+  --seal-ink: #FFFFFF;
+  --glyph-filter: none;
+  --mincho: "Shippori Mincho", "Noto Serif JP", "Noto Serif CJK JP", "Yu Mincho", serif;
+  --ui: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", sans-serif;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #161A19;
+    --card: #1F2422;
+    --ink: #E3E7E4;
+    --muted: #9AA49F;
+    --line: #333B38;
+    --seal: #B8392F;
+    --glyph-filter: invert(1);
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 17px/1.55 var(--ui);
+}
+a { color: inherit; text-decoration-color: var(--line); text-underline-offset: 2px; }
+a:hover { text-decoration-color: currentColor; }
+:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }
+
+/* Search bar */
+header {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  padding: 10px 14px;
+}
+form { display: flex; gap: 8px; max-width: 720px; margin: 0 auto; }
+input[type=search] {
+  flex: 1; min-width: 0;
+  font: 500 22px/1.2 var(--mincho);
+  padding: 9px 12px;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--card); color: var(--ink);
+}
+button {
+  font: 600 15px var(--ui);
+  border-radius: 8px; padding: 0 14px; min-height: 44px;
+  border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  cursor: pointer;
+}
+button.primary { background: var(--seal); border-color: var(--seal); color: var(--seal-ink); }
+#chars { display: flex; flex-wrap: wrap; gap: 6px; max-width: 720px; margin: 8px auto 0; }
+#chars:empty { display: none; }
+#chars button {
+  font: 500 24px/1 var(--mincho); width: 48px; padding: 0;
+}
+#chars button[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 -3px 0 var(--seal); }
+
+main { max-width: 720px; margin: 0 auto; padding: 18px 14px 60px; }
+
+/* Character heading: the seal */
+.entry + .entry { margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--line); }
+.head { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+.seal {
+  flex: none;
+  width: 92px; height: 92px; border-radius: 10px;
+  background: var(--seal); color: var(--seal-ink);
+  font: 700 66px/92px var(--mincho); text-align: center;
+}
+.entry.secondary .seal { width: 64px; height: 64px; font-size: 46px; line-height: 64px; }
+.head h2 { margin: 0; font: 600 17px/1.3 var(--ui); }
+.head > div { min-width: 0; }
+.head .links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.head .links a {
+  font-size: 13.5px; text-decoration: none; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 999px; background: var(--card);
+  padding: 0 11px; min-height: 34px; display: inline-flex; align-items: center;
+}
+.head .links a:hover { border-color: var(--seal); }
+
+/* KANJIDIC2 facts and readings */
+.facts { font-size: 14px; color: var(--muted); margin: 0 0 10px; }
+.facts span + span::before { content: " · "; }
+.facts .rad { font-family: var(--mincho); color: var(--ink); }
+.readings { display: grid; grid-template-columns: max-content 1fr; gap: 3px 12px; margin: 0 0 14px; font-size: 15.5px; }
+.readings dt { color: var(--muted); font-size: 13.5px; padding-top: 2px; }
+.readings dd { margin: 0; }
+.readings .ja { font-family: var(--mincho); font-size: 17px; }
+.readings .oku { color: var(--muted); }
+.readings .vars a { font-family: var(--mincho); font-size: 20px; margin-right: 10px; }
+footer { max-width: 720px; margin: 0 auto; padding: 0 14px 40px; font-size: 12.5px; color: var(--muted); }
+.note {
+  border-left: 3px solid var(--seal);
+  padding: 4px 0 4px 12px; margin: 0 0 14px;
+  color: var(--ink);
+}
+.muted { color: var(--muted); font-size: 15px; }
+
+/* Glyph-origin blocks */
+.block { margin: 18px 0 0; }
+.block h3 { font: 600 14px var(--ui); color: var(--muted); margin: 0 0 8px; letter-spacing: .01em; }
+.prose p { margin: 0 0 10px; }
+.prose ul, .prose ol, .prose dl { margin: 0 0 10px; padding-left: 22px; }
+.prose [lang^=zh], .prose [lang^=ja], .prose .Hani, .prose .Jpan { font-family: var(--mincho); }
+.prose [lang^=zh], .prose [lang^=ja], .prose .Hani, .prose .Jpan, details [lang] { font-style: normal; }
+a.k { text-decoration-style: dotted; text-decoration-color: var(--seal); }
+
+/* Historical forms strip */
+.forms {
+  display: flex; gap: 8px; overflow-x: auto;
+  scroll-snap-type: x proximity; padding: 2px 2px 10px; margin: 0 -2px 8px;
+  -webkit-overflow-scrolling: touch;
+}
+.form {
+  flex: none; width: 104px; scroll-snap-align: start;
+  background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 6px 7px; text-align: center; text-decoration: none;
+  display: flex; flex-direction: column; align-items: center;
+}
+.form img {
+  width: 76px; height: 76px; object-fit: contain;
+  filter: var(--glyph-filter);
+}
+.form .txt { font: 500 40px/76px var(--mincho); height: 76px; }
+.form .script { font-size: 12.5px; line-height: 1.25; margin-top: 6px; }
+.form .period { font-size: 11.5px; line-height: 1.25; color: var(--muted); margin-top: 3px; }
+.form .missing { width: 76px; height: 76px; display: grid; place-items: center; font-size: 11px; color: var(--muted); }
+.rawtable { overflow-x: auto; margin-bottom: 10px; }
+.rawtable img { filter: var(--glyph-filter); }
+.rawtable table { border-collapse: collapse; font-size: 13px; }
+.rawtable th, .rawtable td { border: 1px solid var(--line); padding: 4px; }
+
+details { margin: 6px 0 0; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+summary { cursor: pointer; padding: 10px 12px; font-size: 14.5px; color: var(--muted); min-height: 44px; display: flex; align-items: center; }
+details > div { padding: 0 12px 12px; overflow-x: auto; }
+details table { border-collapse: collapse; font-size: 14px; }
+details td, details th { padding: 3px 10px 3px 0; text-align: left; vertical-align: top; }
+details td span[lang], details td a { font-family: var(--mincho); font-size: 18px; }
+
+.refs { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.refs ol, .refs ul { padding-left: 20px; margin: 4px 0 0; }
+.refs p { margin: 4px 0 0; }
+details .forms { margin: 0 0 6px; }
+
+.status { padding: 24px 0; color: var(--muted); }
+.empty { color: var(--muted); padding: 30px 0; }
+.empty p { margin: 0 0 8px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .entry { animation: in .18s ease-out; }
+  @keyframes in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+}
+</style>
+</head>
+<body>
+<header>
+  <form id="f" autocomplete="off">
+    <input id="q" type="search" lang="ja" enterkeyhint="search" placeholder="漢字" aria-label="Kanji or compound">
+    <button id="paste" type="button" hidden>Paste</button>
+    <button class="primary" type="submit">Look up</button>
+  </form>
+  <div id="chars" role="toolbar" aria-label="Characters"></div>
+</header>
+<main id="out" aria-live="polite">
+  <div class="empty">
+    <p>Paste a kanji or a compound to see its historical forms and glyph origin from English Wiktionary.</p>
+    <p>Tap a dotted character in an explanation to look it up.</p>
+  </div>
+</main>
+<footer>
+  Readings, meanings and other character data: <a href="https://www.edrdg.org/wiki/index.php/KANJIDIC_Project" target="_blank" rel="noopener">KANJIDIC2</a>,
+  property of the <a href="https://www.edrdg.org/" target="_blank" rel="noopener">Electronic Dictionary Research and Development Group</a>,
+  used under its <a href="https://www.edrdg.org/edrdg/licence.html" target="_blank" rel="noopener">licence</a> (CC BY-SA 4.0)<span id="kddate"></span>.
+  Historical forms and glyph origins: <a href="https://en.wiktionary.org/" target="_blank" rel="noopener">English Wiktionary</a> (CC BY-SA).
+</footer>
+
+<script>
+(() => {
+  "use strict";
+  const API = "https://en.wiktionary.org/w/api.php";
+  const WIKT = "https://en.wiktionary.org";
+  const UA = "KanjiGlyphLookup/1.0 (personal page; GitHub Pages)";
+  const HAN = /\p{Script=Han}/u;
+  const HAN_G = /\p{Script=Han}/gu;
+
+  const $ = (s, el = document) => el.querySelector(s);
+  const out = $("#out"), q = $("#q"), charsBar = $("#chars");
+  const cache = new Map();   // title -> Promise<parsed>
+  let current = null;        // character being shown
+  let reqId = 0;
+
+  function el(tag, attrs = {}, ...kids) {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v == null) continue;
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = v;
+      else n.setAttribute(k, v);
+    }
+    for (const k of kids) if (k != null) n.append(k);
+    return n;
+  }
+  const wiktUrl = (t, lang = "en") =>
+    `https://${lang}.wiktionary.org/wiki/${encodeURIComponent(t)}`;
+
+  // ---------- Fetching ----------
+  let sendUA = true;   // drop the Api-User-Agent header if the CORS preflight fails
+  async function fetchPage(title) {
+    const p = new URLSearchParams({
+      action: "parse", page: title, prop: "text", disableeditsection: "1",
+      redirects: "1", format: "json", formatversion: "2", origin: "*"
+    });
+    const url = `${API}?${p}`;
+    let r;
+    try {
+      r = await fetch(url, sendUA ? { headers: { "Api-User-Agent": UA } } : {});
+    } catch (e) {
+      if (!sendUA) throw e;
+      sendUA = false;
+      r = await fetch(url);
+    }
+    if (!r.ok) throw new Error(`Wiktionary returned HTTP ${r.status}`);
+    const j = await r.json();
+    if (j.error) {
+      if (j.error.code === "missingtitle") return { missing: true, title };
+      throw new Error(j.error.info || j.error.code);
+    }
+    return { title: j.parse.title, html: j.parse.text };
+  }
+
+  function lookup(title) {
+    if (!cache.has(title)) {
+      const pr = fetchPage(title).then(d => d.missing ? d : { ...extract(d.html, title), title: d.title });
+      pr.catch(() => cache.delete(title));
+      cache.set(title, pr);
+    }
+    return cache.get(title);
+  }
+
+  // ---------- Extraction ----------
+  function headingOf(node) {
+    if (!node.classList || !node.classList.contains("mw-heading")) return null;
+    return node.querySelector("h1,h2,h3,h4,h5,h6");
+  }
+
+  function extract(html, ch) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const root = doc.querySelector(".mw-parser-output") || doc.body;
+    const blocks = [];
+    const langText = {};
+    let lang = null, langCount = {};
+
+    let node = root.firstElementChild;
+    while (node) {
+      const h = headingOf(node);
+      if (h && h.tagName === "H2") {
+        lang = h.textContent.trim();
+        node = node.nextElementSibling;
+        continue;
+      }
+      if (lang) langText[lang] = (langText[lang] || "") + " " + node.textContent;
+      if (h && /^Glyph origin/.test(h.textContent.trim())) {
+        const b = { lang, heading: h.textContent.trim(), forms: null, prose: [], phonetic: null, refs: null };
+        let s = node.nextElementSibling;
+        while (s && !headingOf(s)) {
+          langText[lang] = (langText[lang] || "") + " " + s.textContent;
+          const t = s.matches("table") ? s : s.querySelector("table.zh-glyph");
+          const th = t && t.querySelector("th");
+          if (th && /Historical forms/.test(th.textContent) && !b.forms) {
+            b.forms = t;
+          } else if (s.classList.contains("NavFrame") && /phonetic series/i.test(s.textContent)) {
+            b.phonetic = s;
+          } else if (s.classList.contains("mw-references-wrap") || s.matches("ol.references")) {
+            b.refs = s;
+          } else if (/^(P|UL|OL|DL)$/.test(s.tagName) && s.textContent.trim()) {
+            b.prose.push(s);
+          }
+          s = s.nextElementSibling;
+        }
+        langCount[lang] = (langCount[lang] || 0) + 1;
+        b.n = langCount[lang];
+        blocks.push(b);
+        node = s;
+        continue;
+      }
+      node = node.nextElementSibling;
+    }
+    for (const b of blocks) b.total = langCount[b.lang];
+
+    // Kyūjitai hook in the Japanese headword line: "…shinjitai kanji, kyūjitai form 學)"
+    let kyujitai = null;
+    const ja = (langText.Japanese || "").replace(/\s+/g, " ");
+    const m = ja.match(/kanji, ky[uū]jitai form\s*(\p{Script=Han})/u);
+    if (m && m[1].normalize("NFC") !== ch.normalize("NFC")) kyujitai = m[1];
+
+    return { blocks, kyujitai };
+  }
+
+  // ---------- Cleaning Wiktionary HTML ----------
+  const KEEP_ATTR = new Set(["href", "lang", "colspan", "rowspan", "title"]);
+  function clean(src) {
+    const n = document.importNode(src, true);
+    n.querySelectorAll("script,style,link,meta,.mw-editsection,.noprint,.mw-empty-elt,img").forEach(x => x.remove());
+    // Citation markers: keep as plain superscript text
+    n.querySelectorAll("sup.reference").forEach(sup => { sup.replaceWith(el("sup", { text: sup.textContent })); });
+    const all = [n, ...n.querySelectorAll("*")];
+    for (const e of all) {
+      for (const a of [...e.attributes]) {
+        if (a.name === "class" && /\b(Hani|Jpan|Hant|Hans)\b/.test(a.value)) continue;
+        if (!KEEP_ATTR.has(a.name)) e.removeAttribute(a.name);
+      }
+      if (e.tagName === "A") {
+        const href = e.getAttribute("href") || "";
+        const local = href.match(/^\/wiki\/([^#?]+)/);
+        if (local) {
+          const target = decodeURIComponent(local[1]);
+          if ([...target].length === 1 && HAN.test(target)) {
+            e.className = "k";
+            e.dataset.k = target;
+          }
+          e.setAttribute("href", WIKT + href);
+        } else if (href.startsWith("//")) {
+          e.setAttribute("href", "https:" + href);
+        } else if (href.startsWith("#")) {
+          e.replaceWith(...e.childNodes);
+          continue;
+        }
+        if (!e.dataset.k) { e.setAttribute("target", "_blank"); e.setAttribute("rel", "noopener"); }
+      }
+    }
+    return n;
+  }
+
+  // ---------- Historical forms ----------
+  function imgUrl(img) {
+    let u = img.getAttribute("src") || "";
+    const ss = img.getAttribute("srcset") || "";
+    const two = ss.split(",").map(s => s.trim().split(/\s+/)).find(p => p[1] === "2x");
+    if (two) u = two[0];
+    if (u.startsWith("//")) u = "https:" + u;
+    return u;
+  }
+
+  function glyphImg(src) {
+    const img = el("img", { src: imgUrl(src), alt: "", loading: "lazy", decoding: "async", referrerpolicy: "strict-origin-when-cross-origin" });
+    img.addEventListener("error", () => {
+      if (img.dataset.retried) { img.replaceWith(el("div", { class: "missing", text: "image unavailable" })); return; }
+      img.dataset.retried = "1";
+      img.src = img.src.replace("//thumb.wikimedia.org/", "//upload.wikimedia.org/");
+    });
+    return img;
+  }
+
+  function expand(row) {
+    const outArr = [];
+    for (const c of row.cells) {
+      const span = parseInt(c.getAttribute("colspan") || "1", 10) || 1;
+      for (let i = 0; i < span; i++) outArr.push(c);
+    }
+    return outArr;
+  }
+
+  function card({ img, txt, script, period, fileA }) {
+    const c = el(fileA ? "a" : "div", {
+      class: "form", role: "listitem",
+      href: fileA ? WIKT + fileA.getAttribute("href") : null,
+      target: fileA ? "_blank" : null, rel: fileA ? "noopener" : null,
+      title: fileA ? "Open the image's file page" : null
+    });
+    c.append(img ? glyphImg(img) : el("div", { class: "txt", text: txt }));
+    if (script) c.append(el("div", { class: "script", text: script }));
+    if (period) c.append(el("div", { class: "period", text: period }));
+    return c;
+  }
+
+  // Full-width rows below the main grid: extra galleries (often hidden on
+  // Wiktionary behind "more") and the source note.
+  const isExtraRow = r =>
+    r.classList.contains("vsHide") || !!r.querySelector(".gallerybox, .mw-collapsible");
+
+  function renderGallery(cell) {
+    const groups = [];
+    let label = "";
+    cell.querySelectorAll(".gallery > *").forEach(g => {
+      if (g.classList.contains("gallerybox")) {
+        const img = g.querySelector("img");
+        if (!img) return;
+        const cap = (g.querySelector(".gallerytext") || {}).textContent || "";
+        if (!groups.length || groups[groups.length - 1].label !== label) groups.push({ label, items: [] });
+        groups[groups.length - 1].items.push({ img, script: label, period: cap.trim(), fileA: g.querySelector("a[href^='/wiki/File:']") });
+      } else if (g.textContent.trim()) {
+        label = g.textContent.trim();
+      }
+    });
+    const n = groups.reduce((a, g) => a + g.items.length, 0);
+    if (!n) return null;
+    const inner = el("div", {});
+    for (const g of groups) {
+      const strip = el("div", { class: "forms", role: "list", "aria-label": g.label || "More forms" });
+      g.items.forEach(it => strip.append(card(it)));
+      inner.append(strip);
+    }
+    return el("details", {}, el("summary", { text: `More collected forms (${n})` }), inner);
+  }
+
+  function renderForms(table) {
+    const rows = [...table.rows];
+    const headerRows = [], dataRows = [], extraRows = [];
+    rows.forEach((r, i) => {
+      if (i === 0) return; // title row
+      const hasTd = [...r.cells].some(c => c.tagName === "TD");
+      if (!hasTd) headerRows.push(r);
+      else if (isExtraRow(r)) extraRows.push(r);
+      else dataRows.push(r);
+    });
+    const scripts = headerRows.length ? expand(headerRows[headerRows.length - 1]) : [];
+    const periods = headerRows.length > 1 ? expand(headerRows[0]) : [];
+    const ok = dataRows.length && dataRows.every(r => expand(r).length === scripts.length);
+    const frag = document.createDocumentFragment();
+    if (!ok) {
+      // Unexpected layout: show Wiktionary's table as-is.
+      const t = document.importNode(table, true);
+      t.querySelectorAll("img").forEach(i => i.replaceWith(glyphImg(i)));
+      t.querySelectorAll("*").forEach(e => { e.removeAttribute("style"); e.removeAttribute("class"); });
+      frag.append(el("div", { class: "rawtable" }, t));
+      return frag;
+    }
+    const strip = el("div", { class: "forms", role: "list", "aria-label": "Historical forms" });
+    for (const r of dataRows) {
+      const cells = expand(r);
+      cells.forEach((cell, i) => {
+        if (i > 0 && cells[i - 1] === cell) return; // spanned cell already drawn
+        const script = scripts[i] ? scripts[i].textContent.trim() : "";
+        const period = periods[i] ? periods[i].textContent.trim().replace(/\s+/g, " ") : "";
+        const imgs = [...cell.querySelectorAll("img")];
+        const fileA = cell.querySelector("a[href^='/wiki/File:']");
+        if (imgs.length) imgs.forEach(img => strip.append(card({ img, script, period, fileA })));
+        else if (cell.textContent.trim()) strip.append(card({ txt: cell.textContent.trim(), script, period }));
+      });
+    }
+    frag.append(strip);
+    for (const r of extraRows) {
+      const cell = r.cells[0];
+      if (cell.querySelector(".gallerybox")) {
+        const g = renderGallery(cell);
+        if (g) frag.append(g);
+      } else if (cell.textContent.trim()) {
+        const body = cell.querySelector(".mw-collapsible-content") || cell;
+        frag.append(el("div", { class: "refs" }, "Image sources", clean(body)));
+      }
+    }
+    return frag;
+  }
+
+  // ---------- KANJIDIC2 (served from this site) ----------
+  let kdPromise = null;
+  function loadKD() {
+    if (!kdPromise) {
+      kdPromise = fetch("data/kanjidic.json")
+        .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(d => {
+          const dd = d._meta && d._meta.dictDate;
+          if (dd) $("#kddate").textContent = `, edition of ${dd}`;
+          return d.chars || {};
+        })
+        .catch(() => { kdPromise = null; return null; });   // optional: page works without it
+    }
+    return kdPromise;
+  }
+
+  const radicalChar = n => String.fromCodePoint(0x2F00 + n - 1).normalize("NFKC");
+
+  function kunNode(k) {
+    const [stem, oku] = k.split(".");
+    const n = el("span", { class: "ja", lang: "ja" }, stem);
+    if (oku) n.append(el("span", { class: "oku", text: oku }));
+    return n;
+  }
+  function joinNodes(items, make) {
+    const dd = el("dd");
+    items.forEach((x, i) => { if (i) dd.append("、"); dd.append(make(x)); });
+    return dd;
+  }
+
+  function renderKD(rec) {
+    const frag = document.createDocumentFragment();
+    if (!rec) return frag;
+    const facts = el("p", { class: "facts" });
+    if (rec.s) facts.append(el("span", { text: `${rec.s} strokes` }));
+    if (rec.r) facts.append(el("span", {}, `Radical ${rec.r} `, el("span", { class: "rad", lang: "ja", text: radicalChar(rec.r) })));
+    if (rec.mo) facts.append(el("span", { text: `Morohashi ${rec.mo}` }));
+    if (rec.f) facts.append(el("span", { text: `Frequency #${rec.f}` }));
+    if (facts.childNodes.length) frag.append(facts);
+
+    const dl = el("dl", { class: "readings" });
+    if (rec.o) dl.append(el("dt", { text: "On" }), joinNodes(rec.o, x => el("span", { class: "ja", lang: "ja", text: x })));
+    if (rec.k) dl.append(el("dt", { text: "Kun" }), joinNodes(rec.k, kunNode));
+    if (rec.n) dl.append(el("dt", { text: "Names" }), joinNodes(rec.n, x => el("span", { class: "ja", lang: "ja", text: x })));
+    if (rec.m) dl.append(el("dt", { text: "Meaning" }), el("dd", { text: rec.m.join("; ") }));
+    if (rec.v) {
+      const dd = el("dd", { class: "vars" });
+      rec.v.forEach(v => dd.append(el("a", { href: wiktUrl(v), class: "k", "data-k": v, lang: "ja", text: v })));
+      dl.append(el("dt", { text: "Variants" }), dd);
+    }
+    if (dl.childNodes.length) frag.append(dl);
+    return frag;
+  }
+
+  // ---------- Links to other sources ----------
+  // CUHK is a Chinese database, so a shinjitai links to its kyūjitai there.
+  // Kanjipedia pages use opaque IDs, so its link goes through site search.
+  const SOURCES = [
+    { label: "Wiktionary", url: c => wiktUrl(c) },
+    { label: "ja.Wiktionary", url: c => wiktUrl(c, "ja") },
+    { label: "CUHK", trad: true,
+      url: c => `https://humanum.arts.cuhk.edu.hk/Lexis/lexi-mf/search.php?word=${encodeURIComponent(c)}` },
+    { label: "Kanjipedia",
+      url: c => `https://www.kanjipedia.jp/search?k=${encodeURIComponent(c)}&kt=1&sk=leftHand` }
+  ];
+  function sourceLinks(ch, kyu) {
+    const box = el("div", { class: "links" });
+    for (const s of SOURCES) {
+      const c = s.trad && kyu ? kyu : ch;
+      box.append(el("a", { href: s.url(c), target: "_blank", rel: "noopener",
+        text: c === ch ? s.label : `${s.label} (${c})` }));
+    }
+    return box;
+  }
+
+  // ---------- Rendering ----------
+  function renderEntry(ch, data, { secondary = false, note = null, kd = null } = {}) {
+    const box = el("section", { class: "entry" + (secondary ? " secondary" : ""), lang: "en" });
+    const head = el("div", { class: "head" },
+      el("div", { class: "seal", lang: "ja", text: ch, "aria-hidden": "true" }),
+      el("div", {},
+        el("h2", { text: secondary ? `${ch}, kyūjitai form` : `${ch}` }),
+        sourceLinks(ch, data.kyujitai)));
+    box.append(head);
+    box.append(renderKD(kd));
+    if (note) box.append(note);
+
+    if (data.missing) {
+      box.append(el("p", { class: "muted", text: `English Wiktionary has no entry for ${ch}.` }));
+      return box;
+    }
+    if (!data.blocks.length) {
+      box.append(el("p", { class: "muted", text: data.kyujitai
+        ? `English Wiktionary has no glyph-origin section for ${ch} itself.`
+        : `No glyph-origin section for ${ch} on English Wiktionary. Open the full entry with the link above.` }));
+      return box;
+    }
+    const anyTable = data.blocks.some(b => b.forms);
+    if (!anyTable && !data.kyujitai) box.append(el("p", { class: "muted", text: "Wiktionary has no historical-forms table for this character." }));
+
+    for (const b of data.blocks) {
+      const label = b.total > 1 ? `${b.lang}, ${b.heading} (${b.n} of ${b.total})` : `${b.lang}, ${b.heading}`;
+      const blk = el("div", { class: "block" }, el("h3", { text: label }));
+      if (b.forms) blk.append(renderForms(b.forms));
+      if (b.prose.length) {
+        const pr = el("div", { class: "prose" });
+        b.prose.forEach(p => pr.append(clean(p)));
+        blk.append(pr);
+      } else if (!b.forms) {
+        blk.append(el("p", { class: "muted", text: "No explanation in this section." }));
+      }
+      if (b.phonetic) {
+        const headTxt = (b.phonetic.querySelector(".NavHead") || {}).textContent || "Characters in the same phonetic series";
+        const content = b.phonetic.querySelector(".NavContent") || b.phonetic;
+        blk.append(el("details", {},
+          el("summary", { text: headTxt.trim().replace(/\s+/g, " ") }),
+          el("div", {}, clean(content))));
+      }
+      if (b.refs) {
+        const r = el("div", { class: "refs" }, "References", clean(b.refs));
+        blk.append(r);
+      }
+      box.append(blk);
+    }
+    return box;
+  }
+
+  async function show(ch) {
+    current = ch;
+    const id = ++reqId;
+    [...charsBar.children].forEach(b => b.setAttribute("aria-pressed", String(b.dataset.k === ch)));
+    out.replaceChildren(el("div", { class: "status", text: `Looking up ${ch}…` }));
+    try {
+      const [data, kdc] = await Promise.all([lookup(ch), loadKD()]);
+      if (id !== reqId) return;
+      const kdFor = c => (kdc && (kdc[c] || kdc[c.normalize("NFC")])) || null;
+      const nodes = [];
+      let kyu = null;
+      if (!data.missing && data.kyujitai) {
+        kyu = data.kyujitai;
+        const note = el("p", { class: "note" },
+          `Japanese shinjitai (new form). Its kyūjitai (traditional form) is `,
+          el("a", { href: wiktUrl(kyu), class: "k", "data-k": kyu, lang: "ja", text: kyu }),
+          ". The traditional form's history is shown below.");
+        nodes.push(renderEntry(ch, data, { note, kd: kdFor(ch) }));
+      } else {
+        nodes.push(renderEntry(ch, data, { kd: kdFor(ch) }));
+      }
+      out.replaceChildren(...nodes);
+      if (kyu) {
+        const pending = el("div", { class: "status", text: `Looking up ${kyu}…` });
+        out.append(pending);
+        const k = await lookup(kyu);
+        if (id !== reqId) return;
+        pending.replaceWith(renderEntry(kyu, { ...k, kyujitai: null }, { secondary: true, kd: kdFor(kyu) }));
+      }
+    } catch (e) {
+      if (id !== reqId) return;
+      out.replaceChildren(el("div", { class: "status" },
+        el("p", { text: `Couldn't load ${ch} from Wiktionary: ${e.message}.` }),
+        el("p", {}, "Check your connection, then tap the character again, or ",
+          el("a", { href: wiktUrl(ch), target: "_blank", rel: "noopener", text: "open Wiktionary directly" }), ".")));
+    }
+  }
+
+  function setQuery(text, { pick = null, push = true } = {}) {
+    const chars = [...new Set(text.match(HAN_G) || [])];
+    charsBar.replaceChildren();
+    if (!chars.length) {
+      out.replaceChildren(el("div", { class: "empty" }, el("p", { text: "No kanji found in that input. Paste one or more kanji and try again." })));
+      return;
+    }
+    if (chars.length > 1) {
+      for (const c of chars) {
+        const b = el("button", { type: "button", lang: "ja", "data-k": c, "aria-pressed": "false", text: c });
+        b.addEventListener("click", () => { show(c); updateUrl(text, c, true); });
+        charsBar.append(b);
+      }
+    }
+    const first = pick && chars.includes(pick) ? pick : chars[0];
+    updateUrl(text, first, push);
+    show(first);
+  }
+
+  function updateUrl(text, c, push) {
+    const u = new URL(location.href);
+    u.searchParams.set("q", text.trim());
+    if (c && [...text.trim()].length > 1) u.searchParams.set("c", c); else u.searchParams.delete("c");
+    history[push ? "pushState" : "replaceState"]({}, "", u);
+  }
+
+  // ---------- Events ----------
+  $("#f").addEventListener("submit", e => {
+    e.preventDefault();
+    q.blur();
+    setQuery(q.value);
+  });
+
+  if (navigator.clipboard && navigator.clipboard.readText) {
+    const pb = $("#paste");
+    pb.hidden = false;
+    pb.addEventListener("click", async () => {
+      try {
+        const t = (await navigator.clipboard.readText()).trim();
+        if (!t) return;
+        q.value = t;
+        setQuery(t);
+      } catch {
+        q.focus();
+      }
+    });
+  }
+
+  // Tap a dotted character inside an explanation to look it up.
+  out.addEventListener("click", e => {
+    const a = e.target.closest("a[data-k]");
+    if (!a) return;
+    e.preventDefault();
+    q.value = a.dataset.k;
+    setQuery(a.dataset.k);
+    window.scrollTo({ top: 0 });
+  });
+
+  function fromUrl() {
+    const u = new URL(location.href);
+    const t = u.searchParams.get("q");
+    if (t) { q.value = t; setQuery(t, { pick: u.searchParams.get("c"), push: false }); }
+  }
+  window.addEventListener("popstate", fromUrl);
+  fromUrl();
+})();
+</script>
+</body>
+</html>
