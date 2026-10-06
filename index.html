@@ -183,6 +183,23 @@ details .forms { margin: 0 0 6px; }
 @media (min-width: 700px) { .dictlinks { grid-template-columns: 1fr 1fr; } }
 .dictlinks .by { color: var(--muted); font-size: 13px; }
 
+/* Title row, code point, save button */
+.titlebar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.head .cp { font: 500 13px var(--ui); color: var(--muted); margin-left: 8px; font-variant-numeric: tabular-nums; }
+button.save { min-height: 34px; font-size: 13.5px; padding: 0 12px; border-radius: 999px; }
+button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 -2px 0 var(--seal); }
+#saved { max-width: 720px; margin: 0 auto; padding: 10px 14px 0; }
+#saved .list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+#saved .list button { font: 500 24px/1 var(--mincho); width: 48px; padding: 0; }
+#saved .acts { display: flex; gap: 8px; }
+#saved .acts button { font-size: 13.5px; min-height: 36px; }
+.credits { margin-top: 14px; }
+.credits .cr-body { font-size: 13.5px; color: var(--muted); }
+.credits .cr-body p { margin: 0 0 8px; }
+.credits .cr-body strong { color: var(--ink); font-weight: 600; }
+.moe { font: 17px/1.8 var(--mincho); }
+.moeimg { height: 1.4em; width: auto; vertical-align: middle; filter: var(--glyph-filter); }
+
 .status { padding: 24px 0; color: var(--muted); }
 .empty { color: var(--muted); padding: 30px 0; }
 .empty p { margin: 0 0 8px; }
@@ -202,6 +219,7 @@ details .forms { margin: 0 0 6px; }
   </form>
   <div id="chars" role="toolbar" aria-label="Characters"></div>
 </header>
+<div id="saved" hidden></div>
 <main id="out" aria-live="polite">
   <div class="empty">
     <p>Paste a kanji or a compound to see its historical forms and glyph origin from Wiktionary, with the 說文解字 entry where there is one.</p>
@@ -217,6 +235,8 @@ details .forms { margin: 0 0 6px; }
   <a href="https://zh.wiktionary.org/" target="_blank" rel="noopener">Chinese Wiktionary</a> (CC BY-SA).
   說文解字 text and seal-script images: <a href="https://zh.wikisource.org/wiki/%E8%AA%AA%E6%96%87%E8%A7%A3%E5%AD%97" target="_blank" rel="noopener">Chinese Wikisource</a>
   (the work is in the public domain; the transcription is a Wikimedia contribution, CC BY-SA unless a page says otherwise).
+  Form images come from <a href="https://commons.wikimedia.org/" target="_blank" rel="noopener">Wikimedia Commons</a>; each entry's "Image credits" lists their licences.
+  <span id="moefoot" hidden>字樣說明 text: 教育部《<a href="https://dict.variants.moe.edu.tw/" target="_blank" rel="noopener">異體字字典</a>》, Ministry of Education, Taiwan.</span>
 </footer>
 
 <script>
@@ -858,11 +878,199 @@ details .forms { margin: 0 0 6px; }
       go();
     };
     run(SW_T, () => shuowenFor(ch), r => renderSw(r, ch));
+    if (MOE_INLINE) run(MOE_T, () => lookupMoe(ch), r => renderMoe(r, ch));
     run(JA_T, () => lookupJa(ch), d => renderJa(d, ch));
     run(ZH_T, () => lookupZh(ch), d => renderZh(d, ch));
     grid.append(dictCard(ch, kyu));
     return wrap;
   }
+
+  // ---------- Code point ----------
+  const cpOf = c => "U+" + c.codePointAt(0).toString(16).toUpperCase().padStart(4, "0");
+
+  // ---------- Saved characters ----------
+  // Kept in localStorage (this browser only). Storage can throw or come back
+  // empty (private windows, blocked site data), so every access is guarded and
+  // the list also lives in memory for the session.
+  const SAVE_KEY = "kanji-lookup:saved";
+  let saved = [];
+  try {
+    const v = JSON.parse(localStorage.getItem(SAVE_KEY) || "[]");
+    if (Array.isArray(v)) saved = v.filter(x => typeof x === "string" && x);
+  } catch { /* no storage: start empty */ }
+  const persist = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(saved)); } catch { /* ignore */ } };
+  const savedBox = $("#saved");
+  let savedOpen = false, clearArmed = false;
+
+  function setSaveBtn(b) {
+    const on = saved.includes(b.dataset.k);
+    b.setAttribute("aria-pressed", String(on));
+    b.textContent = on ? "Saved" : "Save";
+  }
+  function refreshSaved() {
+    document.querySelectorAll("button.save").forEach(setSaveBtn);
+    renderSaved();
+  }
+  function saveButton(c) {
+    const b = el("button", { type: "button", class: "save", "data-k": c });
+    setSaveBtn(b);
+    b.addEventListener("click", () => {
+      saved = saved.includes(c) ? saved.filter(x => x !== c) : [...saved, c];
+      persist();
+      refreshSaved();
+    });
+    return b;
+  }
+  function renderSaved() {
+    savedBox.hidden = !saved.length;
+    if (!saved.length) { savedBox.replaceChildren(); return; }
+    const list = el("div", { class: "list" });
+    for (const c of saved) {
+      const b = el("button", { type: "button", lang: "ja", text: c, "aria-label": `Look up ${c}` });
+      b.addEventListener("click", () => { q.value = c; setQuery(c); window.scrollTo({ top: 0 }); });
+      list.append(b);
+    }
+    const copy = el("button", { type: "button", text: "Copy all" });
+    copy.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(saved.join("")); copy.textContent = "Copied"; }
+      catch { copy.textContent = "Copy failed"; }
+      setTimeout(() => { copy.textContent = "Copy all"; }, 1500);
+    });
+    const clear = el("button", { type: "button", text: "Clear" });
+    clear.addEventListener("click", () => {
+      if (!clearArmed) {
+        clearArmed = true;
+        clear.textContent = "Tap again to clear";
+        setTimeout(() => { clearArmed = false; clear.textContent = "Clear"; }, 3000);
+        return;
+      }
+      clearArmed = false;
+      saved = [];
+      persist();
+      refreshSaved();
+    });
+    const d = el("details", {}, el("summary", { text: `Saved (${saved.length})` }),
+      el("div", {}, list, el("div", { class: "acts" }, copy, clear)));
+    d.open = savedOpen;
+    d.addEventListener("toggle", () => { savedOpen = d.open; });
+    savedBox.replaceChildren(d);
+  }
+
+  // ---------- Image credits (Wikimedia Commons) ----------
+  // One collapsed block per entry instead of a credit line on every card.
+  // Licences are fetched only when the block is opened.
+  const GENERIC_ARTIST = /file history|see user|contributor names|digital file creation/i;
+  const normTitle = t => t.replace(/_/g, " ");
+  function creditsFor(box) {
+    const links = [...box.querySelectorAll(".forms a.form[href*='/wiki/File:'], .rawtable a[href*='/wiki/File:']")];
+    const titles = [...new Set(links.map(a => {
+      try { return normTitle(decodeURIComponent(new URL(a.href).pathname.replace(/^\/wiki\//, ""))); } catch { return null; }
+    }).filter(Boolean))];
+    if (!titles.length) return null;
+    const body = el("div", { class: "cr-body" }, el("p", { class: "muted", text: "Loading…" }));
+    const d = el("details", { class: "credits" },
+      el("summary", { text: `Image credits (${titles.length} image${titles.length > 1 ? "s" : ""})` }), body);
+    let started = false;
+    const load = async () => {
+      try {
+        const info = new Map();
+        for (let i = 0; i < titles.length; i += 50) {
+          const j = await apiGet("commons.wikimedia.org", {
+            action: "query", titles: titles.slice(i, i + 50).join("|"), prop: "imageinfo", redirects: "1",
+            iiprop: "extmetadata", iiextmetadatafilter: "Artist|LicenseShortName"
+          });
+          const to = new Map((j.query.redirects || []).map(r => [normTitle(r.from), normTitle(r.to)]));
+          for (const pg of j.query.pages || []) {
+            const m = ((pg.imageinfo || [])[0] || {}).extmetadata || {};
+            const artist = new DOMParser().parseFromString((m.Artist || {}).value || "", "text/html").body.textContent.replace(/\s+/g, " ").trim();
+            info.set(normTitle(pg.title), { lic: (m.LicenseShortName || {}).value || "", artist });
+          }
+          for (const [f, t] of to) if (info.has(t)) info.set(f, info.get(t));
+        }
+        const groups = new Map();
+        for (const t of titles) {
+          const x = info.get(t) || {};
+          const lic = x.lic || "Licence not listed on Commons";
+          const g = groups.get(lic) || { files: [], artists: new Set() };
+          g.files.push(t);
+          if (x.artist && !GENERIC_ARTIST.test(x.artist)) g.artists.add(x.artist.slice(0, 80));
+          groups.set(lic, g);
+        }
+        body.replaceChildren();
+        for (const [lic, g] of [...groups].sort((a, b) => b[1].files.length - a[1].files.length)) {
+          const p = el("p", {}, el("strong", { text: lic }), ` · ${g.files.length}: `);
+          g.files.forEach((t, i) => {
+            if (i) p.append(", ");
+            const name = t.replace(/^File:/, "");
+            p.append(el("a", { href: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(name.replace(/ /g, "_"))}`,
+              target: "_blank", rel: "noopener", text: name }));
+          });
+          const au = [...g.artists].slice(0, 6);
+          p.append(au.length ? `. Authors: ${au.join("; ")}.` : ". Authors: see each file's history on Commons.");
+          body.append(p);
+        }
+      } catch (e) {
+        started = false;
+        body.replaceChildren(el("p", { class: "muted", text: `Couldn't load credits: ${e.message}. Close and reopen to retry.` }));
+      }
+    };
+    d.addEventListener("toggle", () => { if (d.open && !started) { started = true; load(); } });
+    return d;
+  }
+
+  // ---------- MOE 異體字字典: 字樣說明 (kaisho and component-form notes) ----------
+  // Turned on by the site owner. The licence page MOE links from this
+  // dictionary (language.moe.gov.tw/…/respub) grants CC BY-ND 3.0 Taiwan; its
+  // scope sentence names four other dictionaries and not 異體字字典, whose pages
+  // say "All rights reserved". Set MOE_INLINE to false to hide the excerpt.
+  // The text is shown unmodified, with attribution.
+  const MOE_INLINE = true;
+  const MOE_BASE = "https://dict.variants.moe.edu.tw";
+  const MOE_T = ["字樣說明 · 異體字字典, Taiwan MOE", "Modern dictionary"];
+  const moeCache = new Map();
+  function lookupMoe(ch) {
+    if (!moeCache.has(ch)) {
+      const pr = (async () => {
+        const page = async u => {
+          const r = await fetch(u);
+          if (!r.ok) throw new Error(`dict.variants.moe.edu.tw returned HTTP ${r.status}`);
+          return new DOMParser().parseFromString(await r.text(), "text/html");
+        };
+        const s = await page(`${MOE_BASE}/search.jsp?QTP=0&WORD=${encodeURIComponent(ch)}`);
+        const a = [...s.querySelectorAll("a[data-ucs]")].find(x => x.dataset.ucs === cpOf(ch));
+        if (!a) return { none: true };
+        const id = new URL(a.getAttribute("href"), MOE_BASE + "/").searchParams.get("ID");
+        const e = await page(`${MOE_BASE}/dictView.jsp?ID=${encodeURIComponent(id)}&q=1`);
+        const row = [...e.querySelectorAll("table#view tr")].find(r => /字樣說明/.test((r.querySelector("th") || {}).textContent || ""));
+        return { td: row && row.querySelector("td"), id };
+      })();
+      pr.catch(() => moeCache.delete(ch));
+      moeCache.set(ch, pr);
+    }
+    return moeCache.get(ch);
+  }
+  function renderMoe(r, ch) {
+    const b = srcBlock(...MOE_T);
+    if (r.none || !r.td) {
+      b.append(el("p", { class: "muted", text: `No 字樣說明 for ${ch} in 異體字字典.` }));
+      return b;
+    }
+    const t = document.importNode(r.td, true);
+    t.querySelectorAll("img").forEach(i => {
+      const src = i.getAttribute("src") || "";
+      i.replaceWith(el("img", { class: "moeimg", src: src.startsWith("/") ? MOE_BASE + src : `${MOE_BASE}/${src}`,
+        alt: i.getAttribute("alt") || "", loading: "lazy" }));
+    });
+    for (const e of t.querySelectorAll("*")) {
+      if (e.tagName === "IMG") continue;
+      for (const a of [...e.attributes]) e.removeAttribute(a.name);
+    }
+    b.append(el("div", { class: "moe", lang: "zh-Hant" }, ...t.childNodes));
+    b.append(el("p", { class: "srcnote" }, "教育部《異體字字典》 · ",
+      el("a", { href: `${MOE_BASE}/dictView.jsp?ID=${encodeURIComponent(r.id)}&q=1`, target: "_blank", rel: "noopener", text: "open the entry" })));
+    return b;
+  }
+  if (MOE_INLINE) $("#moefoot").hidden = false;
 
   // ---------- Rendering ----------
   function renderEntry(ch, data, { secondary = false, note = null, kd = null } = {}) {
@@ -870,12 +1078,19 @@ details .forms { margin: 0 0 6px; }
     const head = el("div", { class: "head" },
       el("div", { class: "seal", lang: "ja", text: ch, "aria-hidden": "true" }),
       el("div", {},
-        el("h2", { text: secondary ? `${ch}, kyūjitai form` : `${ch}` }),
+        el("div", { class: "titlebar" },
+          el("h2", {}, secondary ? `${ch}, kyūjitai form` : ch, el("span", { class: "cp", text: cpOf(ch) })),
+          saveButton(ch)),
         sourceLinks(ch, data.kyujitai)));
     box.append(head);
     box.append(renderKD(kd));
     if (note) box.append(note);
-    const finish = () => { box.append(extrasFor(ch, data.kyujitai)); return box; };
+    const finish = () => {
+      const cr = creditsFor(box);
+      if (cr) box.append(cr);
+      box.append(extrasFor(ch, data.kyujitai));
+      return box;
+    };
 
     if (data.missing) {
       box.append(el("p", { class: "muted", text: `English Wiktionary has no entry for ${ch}.` }));
@@ -1019,6 +1234,7 @@ details .forms { margin: 0 0 6px; }
     if (t) { q.value = t; setQuery(t, { pick: u.searchParams.get("c"), push: false }); }
   }
   window.addEventListener("popstate", fromUrl);
+  renderSaved();
   fromUrl();
 })();
 </script>
