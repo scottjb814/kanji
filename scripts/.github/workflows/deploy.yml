@@ -1,0 +1,52 @@
+# Builds the site and deploys it to GitHub Pages.
+# Runs when you change anything on main, once a month to pick up a fresh
+# KANJIDIC2 (the EDRDG licence asks users to keep the data current), and on
+# demand from the Actions tab ("Run workflow").
+#
+# Requires: Settings > Pages > Build and deployment > Source = "GitHub Actions".
+
+name: Build and deploy
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 6 3 * *"   # 06:17 UTC on the 3rd of each month
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build KANJIDIC2 data
+        run: python3 scripts/build_kanjidic.py _site/data/kanjidic.json
+
+      - name: Assemble site
+        run: cp index.html _site/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
