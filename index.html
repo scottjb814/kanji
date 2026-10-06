@@ -161,6 +161,16 @@ details td span[lang], details td a { font-family: var(--mincho); font-size: 18p
 .refs p { margin: 4px 0 0; }
 details .forms { margin: 0 0 6px; }
 
+/* Accounts from other sources (ja.Wiktionary 字源, 說文解字) */
+.extras { margin-top: 6px; }
+.block.src { border-top: 1px solid var(--line); padding-top: 14px; }
+.block.src h3 .type { font-weight: 400; }
+.sw { font: 18px/1.8 var(--mincho); }
+.sw p { margin: 0 0 8px; }
+.ss { height: 1.7em; width: auto; vertical-align: middle; margin: 0 2px; filter: var(--glyph-filter); }
+.srcnote { font-size: 13px; color: var(--muted); margin: 4px 0 0; }
+.retry { min-height: 36px; font-size: 13.5px; margin-left: 8px; }
+
 .status { padding: 24px 0; color: var(--muted); }
 .empty { color: var(--muted); padding: 30px 0; }
 .empty p { margin: 0 0 8px; }
@@ -182,7 +192,7 @@ details .forms { margin: 0 0 6px; }
 </header>
 <main id="out" aria-live="polite">
   <div class="empty">
-    <p>Paste a kanji or a compound to see its historical forms and glyph origin from English Wiktionary.</p>
+    <p>Paste a kanji or a compound to see its historical forms and glyph origin from Wiktionary, with the 說文解字 entry where there is one.</p>
     <p>Tap a dotted character in an explanation to look it up.</p>
   </div>
 </main>
@@ -190,7 +200,10 @@ details .forms { margin: 0 0 6px; }
   Readings, meanings and other character data: <a href="https://www.edrdg.org/wiki/index.php/KANJIDIC_Project" target="_blank" rel="noopener">KANJIDIC2</a>,
   property of the <a href="https://www.edrdg.org/" target="_blank" rel="noopener">Electronic Dictionary Research and Development Group</a>,
   used under its <a href="https://www.edrdg.org/edrdg/licence.html" target="_blank" rel="noopener">licence</a> (CC BY-SA 4.0)<span id="kddate"></span>.
-  Historical forms and glyph origins: <a href="https://en.wiktionary.org/" target="_blank" rel="noopener">English Wiktionary</a> (CC BY-SA).
+  Historical forms and glyph origins: <a href="https://en.wiktionary.org/" target="_blank" rel="noopener">English Wiktionary</a> and
+  <a href="https://ja.wiktionary.org/" target="_blank" rel="noopener">Japanese Wiktionary</a> (CC BY-SA).
+  說文解字 text and seal-script images: <a href="https://zh.wikisource.org/wiki/%E8%AA%AA%E6%96%87%E8%A7%A3%E5%AD%97" target="_blank" rel="noopener">Chinese Wikisource</a>
+  (the work is in the public domain; the transcription is a Wikimedia contribution, CC BY-SA unless a page says otherwise).
 </footer>
 
 <script>
@@ -245,6 +258,23 @@ details .forms { margin: 0 0 6px; }
       throw new Error(j.error.info || j.error.code);
     }
     return { title: j.parse.title, html: j.parse.text };
+  }
+
+  // Same request shape as fetchPage, for the other wikis.
+  async function apiGet(host, params) {
+    const url = `https://${host}/w/api.php?` + new URLSearchParams({ ...params, format: "json", formatversion: "2", origin: "*" });
+    let r;
+    try {
+      r = await fetch(url, sendUA ? { headers: { "Api-User-Agent": UA } } : {});
+    } catch (e) {
+      if (!sendUA) throw e;
+      sendUA = false;
+      r = await fetch(url);
+    }
+    if (!r.ok) throw new Error(`${host} returned HTTP ${r.status}`);
+    const j = await r.json();
+    if (j.error) { const err = new Error(j.error.info || j.error.code); err.code = j.error.code; throw err; }
+    return j;
   }
 
   function lookup(title) {
@@ -315,9 +345,91 @@ details .forms { margin: 0 0 6px; }
     return { blocks, kyujitai };
   }
 
+  // ---------- Japanese Wiktionary: 字源 ----------
+  // Prose and footnotes only. Its forms table repeats the images already
+  // shown from English Wiktionary, so it is skipped.
+  const jaCache = new Map();
+  function lookupJa(title) {
+    if (!jaCache.has(title)) {
+      const pr = apiGet("ja.wiktionary.org", { action: "parse", page: title, prop: "text", disableeditsection: "1", redirects: "1" })
+        .then(j => extractJa(j.parse.text))
+        .catch(e => { if (e.code === "missingtitle") return { missing: true, blocks: [] }; throw e; });
+      pr.catch(() => jaCache.delete(title));
+      jaCache.set(title, pr);
+    }
+    return jaCache.get(title);
+  }
+
+  function extractJa(html) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const root = doc.querySelector(".mw-parser-output") || doc.body;
+    const blocks = [];
+    let node = root.firstElementChild;
+    while (node) {
+      const h = headingOf(node);
+      if (h && /^字源/.test(h.textContent.trim())) {
+        const b = { prose: [], refs: null };
+        let s = node.nextElementSibling;
+        while (s && !headingOf(s)) {
+          if (s.id === "jigen" || s.matches("table")) { /* forms table: skipped */ }
+          else if (s.classList.contains("mw-references-wrap") || s.matches("ol.references")) b.refs = s;
+          else if (/^(P|UL|OL|DL|BLOCKQUOTE)$/.test(s.tagName) && s.textContent.trim()) b.prose.push(s);
+          s = s.nextElementSibling;
+        }
+        blocks.push(b);
+        node = s;
+        continue;
+      }
+      node = node.nextElementSibling;
+    }
+    blocks.forEach((b, i) => { b.n = i + 1; b.total = blocks.length; });
+    return { blocks };
+  }
+
+  // ---------- 說文解字 on Chinese Wikisource ----------
+  // data/shuowen_index.json says which of the 15 pages holds a headword
+  // (built by scripts/build_shuowen_index.py). Only that one page is fetched.
+  let swIndexP = null;
+  function loadSwIndex() {
+    if (!swIndexP) {
+      swIndexP = fetch("data/shuowen_index.json")
+        .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .catch(() => { swIndexP = null; return null; });
+    }
+    return swIndexP;
+  }
+  const swPages = new Map();
+  function loadSwPage(n) {
+    if (!swPages.has(n)) {
+      const title = `說文解字/${String(n).padStart(2, "0")}`;
+      const pr = apiGet("zh.wikisource.org", { action: "parse", page: title, prop: "text", disableeditsection: "1" })
+        .then(j => {
+          const doc = new DOMParser().parseFromString(j.parse.text, "text/html");
+          const map = new Map();
+          for (const p of doc.querySelectorAll(".mw-parser-output > p")) {
+            const m = p.textContent.trimStart().match(/^(.)(?:（[^）]*）)?：/su);
+            if (m && !map.has(m[1])) map.set(m[1], p);
+          }
+          return map;
+        });
+      pr.catch(() => swPages.delete(n));
+      swPages.set(n, pr);
+    }
+    return swPages.get(n);
+  }
+  async function shuowenFor(ch) {
+    const idx = await loadSwIndex();
+    if (!idx) return { unavailable: true };
+    const hit = idx.chars[ch] || idx.chars[ch.normalize("NFC")];
+    if (!hit) return { none: true };
+    const p = (await loadSwPage(hit[0])).get(ch) || (await loadSwPage(hit[0])).get(ch.normalize("NFC"));
+    if (!p) return { none: true };
+    return { p, page: hit[0], bu: hit[1] };
+  }
+
   // ---------- Cleaning Wiktionary HTML ----------
   const KEEP_ATTR = new Set(["href", "lang", "colspan", "rowspan", "title"]);
-  function clean(src) {
+  function clean(src, base = WIKT) {
     const n = document.importNode(src, true);
     n.querySelectorAll("script,style,link,meta,.mw-editsection,.noprint,.mw-empty-elt,img").forEach(x => x.remove());
     // Citation markers: keep as plain superscript text
@@ -337,7 +449,7 @@ details .forms { margin: 0 0 6px; }
             e.className = "k";
             e.dataset.k = target;
           }
-          e.setAttribute("href", WIKT + href);
+          e.setAttribute("href", base + href);
         } else if (href.startsWith("//")) {
           e.setAttribute("href", "https:" + href);
         } else if (href.startsWith("#")) {
@@ -555,6 +667,101 @@ details .forms { margin: 0 0 6px; }
     return box;
   }
 
+  // ---------- Other accounts: ja.Wiktionary 字源 and 說文解字 ----------
+  function srcBlock(title, type) {
+    return el("div", { class: "block src" },
+      el("h3", {}, title, el("span", { class: "type", text: ` · ${type}` })));
+  }
+  function failed(title, type, err, retry) {
+    const b = srcBlock(title, type);
+    const msg = el("p", { class: "muted", text: `Couldn't load this: ${err.message}.` });
+    const btn = el("button", { type: "button", class: "retry", text: "Retry" });
+    btn.addEventListener("click", retry);
+    msg.append(btn);
+    b.append(msg);
+    return b;
+  }
+
+  const JA_T = ["字源", "ja.Wiktionary, crowd-sourced"];
+  function renderJa(d, ch) {
+    if (d.missing || !d.blocks.length) {
+      const b = srcBlock(...JA_T);
+      b.append(el("p", { class: "muted", text: d.missing
+        ? `Japanese Wiktionary has no entry for ${ch}.`
+        : `No 字源 section for ${ch} on Japanese Wiktionary.` }));
+      return b;
+    }
+    const frag = document.createDocumentFragment();
+    for (const bl of d.blocks) {
+      const b = srcBlock(bl.total > 1 ? `${JA_T[0]} (${bl.n} of ${bl.total})` : JA_T[0], JA_T[1]);
+      const pr = el("div", { class: "prose", lang: "ja" });
+      bl.prose.forEach(p => pr.append(clean(p, "https://ja.wiktionary.org")));
+      b.append(pr);
+      if (bl.refs) b.append(el("div", { class: "refs", lang: "ja" }, "References", clean(bl.refs, "https://ja.wiktionary.org")));
+      frag.append(b);
+    }
+    return frag;
+  }
+
+  const SW_T = ["說文解字", "classical text, via zh.Wikisource"];
+  const JUAN = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二", "十三", "十四", "十五"];
+  function swText(p) {
+    const n = document.importNode(p, true);
+    n.querySelectorAll("span[typeof='mw:File']").forEach(sp => {
+      const img = sp.querySelector("img");
+      if (!img) { sp.remove(); return; }
+      const g = glyphImg(img);
+      g.className = "ss";
+      g.alt = "seal script form";
+      sp.replaceWith(g);
+    });
+    n.querySelectorAll("a").forEach(a => a.replaceWith(...a.childNodes));
+    for (const e of n.querySelectorAll("*")) {
+      if (e.tagName === "IMG") continue;
+      for (const a of [...e.attributes]) e.removeAttribute(a.name);
+    }
+    for (const a of [...n.attributes]) n.removeAttribute(a.name);
+    return n;
+  }
+  function renderSw(r, ch) {
+    const b = srcBlock(...SW_T);
+    if (r.unavailable) {
+      b.append(el("p", { class: "muted", text: "The 說文解字 index (data/shuowen_index.json) didn't load." }));
+      return b;
+    }
+    if (r.none) {
+      b.append(el("p", { class: "muted", text: `No entry for ${ch} in this transcription of 說文解字. It leaves out the variant forms (重文) that many entries list.` }));
+      return b;
+    }
+    b.append(el("div", { class: "sw", lang: "zh-Hant" }, swText(r.p)));
+    const page = `說文解字/${String(r.page).padStart(2, "0")}`;
+    b.append(el("p", { class: "srcnote" }, `卷${JUAN[r.page - 1]} · ${r.bu} · `,
+      el("a", { href: `https://zh.wikisource.org/wiki/${encodeURIComponent(page)}#${encodeURIComponent(r.bu)}`,
+        target: "_blank", rel: "noopener", text: "open on zh.Wikisource" })));
+    return b;
+  }
+
+  function extrasFor(ch) {
+    const wrap = el("div", { class: "extras" });
+    const loading = (title, type) => {
+      const s = srcBlock(title, type);
+      s.append(el("p", { class: "muted", text: "Loading…" }));
+      return s;
+    };
+    const run = ([title, type], load, render) => {
+      let cur = loading(title, type);
+      wrap.append(cur);
+      const go = () => load().then(d => cur.replaceWith(render(d))).catch(err => {
+        const f = failed(title, type, err, () => { const l = loading(title, type); f.replaceWith(l); cur = l; go(); });
+        cur.replaceWith(f);
+      });
+      go();
+    };
+    run(JA_T, () => lookupJa(ch), d => renderJa(d, ch));
+    run(SW_T, () => shuowenFor(ch), r => renderSw(r, ch));
+    return wrap;
+  }
+
   // ---------- Rendering ----------
   function renderEntry(ch, data, { secondary = false, note = null, kd = null } = {}) {
     const box = el("section", { class: "entry" + (secondary ? " secondary" : ""), lang: "en" });
@@ -566,16 +773,17 @@ details .forms { margin: 0 0 6px; }
     box.append(head);
     box.append(renderKD(kd));
     if (note) box.append(note);
+    const finish = () => { box.append(extrasFor(ch)); return box; };
 
     if (data.missing) {
       box.append(el("p", { class: "muted", text: `English Wiktionary has no entry for ${ch}.` }));
-      return box;
+      return finish();
     }
     if (!data.blocks.length) {
       box.append(el("p", { class: "muted", text: data.kyujitai
         ? `English Wiktionary has no glyph-origin section for ${ch} itself.`
         : `No glyph-origin section for ${ch} on English Wiktionary. Open the full entry with the link above.` }));
-      return box;
+      return finish();
     }
     const anyTable = data.blocks.some(b => b.forms);
     if (!anyTable && !data.kyujitai) box.append(el("p", { class: "muted", text: "Wiktionary has no historical-forms table for this character." }));
@@ -604,7 +812,7 @@ details .forms { margin: 0 0 6px; }
       }
       box.append(blk);
     }
-    return box;
+    return finish();
   }
 
   async function show(ch) {
