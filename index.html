@@ -117,7 +117,7 @@ footer { max-width: 720px; margin: 0 auto; padding: 0 14px 40px; font-size: 12.5
 
 /* Glyph-origin blocks */
 .block { margin: 18px 0 0; }
-.block h3 { font: 600 14px var(--ui); color: var(--muted); margin: 0 0 8px; letter-spacing: .01em; }
+.block h3 { font: 600 14px var(--ui); color: var(--muted); margin: 0 0 8px; letter-spacing: .01em; display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 8px; }
 .prose p { margin: 0 0 10px; }
 .prose ul, .prose ol, .prose dl { margin: 0 0 10px; padding-left: 22px; }
 .prose [lang^=zh], .prose [lang^=ja], .prose .Hani, .prose .Jpan { font-family: var(--mincho); }
@@ -161,15 +161,27 @@ details td span[lang], details td a { font-family: var(--mincho); font-size: 18p
 .refs p { margin: 4px 0 0; }
 details .forms { margin: 0 0 6px; }
 
-/* Accounts from other sources (ja.Wiktionary 字源, 說文解字) */
-.extras { margin-top: 6px; }
-.block.src { border-top: 1px solid var(--line); padding-top: 14px; }
-.block.src h3 .type { font-weight: 400; }
+/* Accounts from other sources, each labelled by source type */
+.extras { margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--line); }
+.extras > h3 { font: 600 14px var(--ui); color: var(--muted); margin: 0 0 10px; }
+.accounts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-items: start; }
+@media (min-width: 700px) {
+  .accounts { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .acct.wide { grid-column: 1 / -1; }
+}
+.acct { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.acct h3 { margin: 0 0 8px; font: 600 14.5px/1.35 var(--ui); display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 8px; }
+.chip { font: 600 11.5px/1.5 var(--ui); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 8px; white-space: nowrap; }
+.acct .prose { font-size: 16px; }
+.acct .prose ul, .acct .prose ol, .acct .prose dl { padding-left: 20px; }
 .sw { font: 18px/1.8 var(--mincho); }
 .sw p { margin: 0 0 8px; }
 .ss { height: 1.7em; width: auto; vertical-align: middle; margin: 0 2px; filter: var(--glyph-filter); }
 .srcnote { font-size: 13px; color: var(--muted); margin: 4px 0 0; }
 .retry { min-height: 36px; font-size: 13.5px; margin-left: 8px; }
+.dictlinks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px 18px; font-size: 15px; }
+@media (min-width: 700px) { .dictlinks { grid-template-columns: 1fr 1fr; } }
+.dictlinks .by { color: var(--muted); font-size: 13px; }
 
 .status { padding: 24px 0; color: var(--muted); }
 .empty { color: var(--muted); padding: 30px 0; }
@@ -200,8 +212,9 @@ details .forms { margin: 0 0 6px; }
   Readings, meanings and other character data: <a href="https://www.edrdg.org/wiki/index.php/KANJIDIC_Project" target="_blank" rel="noopener">KANJIDIC2</a>,
   property of the <a href="https://www.edrdg.org/" target="_blank" rel="noopener">Electronic Dictionary Research and Development Group</a>,
   used under its <a href="https://www.edrdg.org/edrdg/licence.html" target="_blank" rel="noopener">licence</a> (CC BY-SA 4.0)<span id="kddate"></span>.
-  Historical forms and glyph origins: <a href="https://en.wiktionary.org/" target="_blank" rel="noopener">English Wiktionary</a> and
-  <a href="https://ja.wiktionary.org/" target="_blank" rel="noopener">Japanese Wiktionary</a> (CC BY-SA).
+  Historical forms and glyph origins: <a href="https://en.wiktionary.org/" target="_blank" rel="noopener">English Wiktionary</a>,
+  <a href="https://ja.wiktionary.org/" target="_blank" rel="noopener">Japanese Wiktionary</a> and
+  <a href="https://zh.wiktionary.org/" target="_blank" rel="noopener">Chinese Wiktionary</a> (CC BY-SA).
   說文解字 text and seal-script images: <a href="https://zh.wikisource.org/wiki/%E8%AA%AA%E6%96%87%E8%A7%A3%E5%AD%97" target="_blank" rel="noopener">Chinese Wikisource</a>
   (the work is in the public domain; the transcription is a Wikimedia contribution, CC BY-SA unless a page says otherwise).
 </footer>
@@ -643,18 +656,18 @@ details .forms { margin: 0 0 6px; }
   const SOURCES = [
     { label: "Wiktionary", url: c => wiktUrl(c) },
     { label: "ja.Wiktionary", url: c => wiktUrl(c, "ja") },
-    { label: "CUHK", trad: true,
+    { label: "CUHK", trad: true, dict: true, note: "漢語多功能字庫, Chinese University of Hong Kong",
       url: c => `https://humanum.arts.cuhk.edu.hk/Lexis/lexi-mf/search.php?word=${encodeURIComponent(c)}` },
-    { label: "Kanjipedia",
+    { label: "Kanjipedia", dict: true, note: "なりたち, from 角川新字源 (KADOKAWA)",
       url: c => `https://www.kanjipedia.jp/search?k=${encodeURIComponent(c)}&kt=1&sk=leftHand` },
     // Kotobank carries 普及版 字通; the fragment jumps to that dictionary's
     // section (Kotobank's own anchor; if a character has no 字通 entry the
     // page simply opens at the top).
-    { label: "字通",
+    { label: "字通", dict: true, note: "平凡社, through Kotobank",
       url: c => `https://kotobank.jp/word/${encodeURIComponent(c)}#E6.99.AE.E5.8F.8A.E7.89.88.20.E5.AD.97.E9.80.9A` },
     // Taiwan MOE 異體字字典. Entry URLs use internal numeric IDs, so link to
     // its GET search. It finds shinjitai too (学 is listed under 學).
-    { label: "MOE 異體字",
+    { label: "MOE 異體字字典", short: "MOE 異體字", dict: true, note: "Ministry of Education, Taiwan",
       url: c => `https://dict.variants.moe.edu.tw/search.jsp?QTP=0&WORD=${encodeURIComponent(c)}` }
   ];
   function sourceLinks(ch, kyu) {
@@ -662,18 +675,19 @@ details .forms { margin: 0 0 6px; }
     for (const s of SOURCES) {
       const c = s.trad && kyu ? kyu : ch;
       box.append(el("a", { href: s.url(c), target: "_blank", rel: "noopener",
-        text: c === ch ? s.label : `${s.label} (${c})` }));
+        text: (s.short || s.label) + (c === ch ? "" : ` (${c})`) }));
     }
     return box;
   }
 
-  // ---------- Other accounts: ja.Wiktionary 字源 and 說文解字 ----------
-  function srcBlock(title, type) {
-    return el("div", { class: "block src" },
-      el("h3", {}, title, el("span", { class: "type", text: ` · ${type}` })));
+  // ---------- Other accounts, labelled by source type ----------
+  // Each card says what kind of source it is (crowd-sourced, classical text,
+  // modern dictionary), not how reliable it is.
+  function srcBlock(title, kind) {
+    return el("div", { class: "acct" }, el("h3", {}, el("span", { class: "chip", text: kind }), title));
   }
-  function failed(title, type, err, retry) {
-    const b = srcBlock(title, type);
+  function failed(title, kind, err, retry) {
+    const b = srcBlock(title, kind);
     const msg = el("p", { class: "muted", text: `Couldn't load this: ${err.message}.` });
     const btn = el("button", { type: "button", class: "retry", text: "Retry" });
     btn.addEventListener("click", retry);
@@ -681,8 +695,14 @@ details .forms { margin: 0 0 6px; }
     b.append(msg);
     return b;
   }
+  const prose = (nodes, base, lang) => {
+    const pr = el("div", { class: "prose", lang });
+    nodes.forEach(p => pr.append(clean(p, base)));
+    return pr;
+  };
 
-  const JA_T = ["字源", "ja.Wiktionary, crowd-sourced"];
+  const JA_K = "Crowd-sourced", JA_BASE = "https://ja.wiktionary.org";
+  const JA_T = ["字源 · ja.Wiktionary", JA_K];
   function renderJa(d, ch) {
     if (d.missing || !d.blocks.length) {
       const b = srcBlock(...JA_T);
@@ -693,17 +713,81 @@ details .forms { margin: 0 0 6px; }
     }
     const frag = document.createDocumentFragment();
     for (const bl of d.blocks) {
-      const b = srcBlock(bl.total > 1 ? `${JA_T[0]} (${bl.n} of ${bl.total})` : JA_T[0], JA_T[1]);
-      const pr = el("div", { class: "prose", lang: "ja" });
-      bl.prose.forEach(p => pr.append(clean(p, "https://ja.wiktionary.org")));
-      b.append(pr);
-      if (bl.refs) b.append(el("div", { class: "refs", lang: "ja" }, "References", clean(bl.refs, "https://ja.wiktionary.org")));
+      const b = srcBlock(bl.total > 1 ? `字源 (${bl.n} of ${bl.total}) · ja.Wiktionary` : JA_T[0], JA_K);
+      b.append(prose(bl.prose, JA_BASE, "ja"));
+      if (bl.refs) b.append(el("div", { class: "refs", lang: "ja" }, "References", clean(bl.refs, JA_BASE)));
       frag.append(b);
     }
     return frag;
   }
 
-  const SW_T = ["說文解字", "classical text, via zh.Wikisource"];
+  // Chinese Wiktionary: prose of its 字源 sections only. Its forms table uses
+  // the same image files as English Wiktionary, and its 說文 quotation repeats
+  // the Wikisource card, so neither is shown again.
+  const ZH_BASE = "https://zh.wiktionary.org";
+  const ZH_T = ["字源 · zh.Wiktionary", "Crowd-sourced"];
+  const zhCache = new Map();
+  function lookupZh(title) {
+    if (!zhCache.has(title)) {
+      const pr = apiGet("zh.wiktionary.org", { action: "parse", page: title, prop: "text", disableeditsection: "1", redirects: "1" })
+        .then(j => extractZh(j.parse.text))
+        .catch(e => { if (e.code === "missingtitle") return { missing: true, blocks: [] }; throw e; });
+      pr.catch(() => zhCache.delete(title));
+      zhCache.set(title, pr);
+    }
+    return zhCache.get(title);
+  }
+  function extractZh(html) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const root = doc.querySelector(".mw-parser-output") || doc.body;
+    const blocks = [];
+    let sections = 0;
+    let node = root.firstElementChild;
+    while (node) {
+      const h = headingOf(node);
+      if (h && /^字源/.test(h.textContent.trim())) {
+        sections++;
+        const b = { prose: [], refs: null };
+        let s = node.nextElementSibling;
+        while (s && !headingOf(s)) {
+          if (s.classList.contains("mw-references-wrap") || s.matches("ol.references")) b.refs = s;
+          else if (/^(P|UL|OL|DL|BLOCKQUOTE)$/.test(s.tagName)) {
+            const t = s.textContent.trim();
+            // skip empty nodes and the "related Wikipedia articles" link list
+            if (t && !/^維基百科有以下相關/.test(t)) b.prose.push(s);
+          }
+          s = s.nextElementSibling;
+        }
+        if (b.prose.length) blocks.push(b);
+        node = s;
+        continue;
+      }
+      node = node.nextElementSibling;
+    }
+    blocks.forEach((b, i) => { b.n = i + 1; b.total = blocks.length; });
+    return { blocks, sections };
+  }
+  function renderZh(d, ch) {
+    if (d.missing || !d.blocks.length) {
+      const b = srcBlock(...ZH_T);
+      b.append(el("p", { class: "muted", text: d.missing
+        ? `Chinese Wiktionary has no entry for ${ch}.`
+        : d.sections
+          ? `Chinese Wiktionary's 字源 for ${ch} has no text beyond the forms table.`
+          : `No 字源 section for ${ch} on Chinese Wiktionary.` }));
+      return b;
+    }
+    const frag = document.createDocumentFragment();
+    for (const bl of d.blocks) {
+      const b = srcBlock(bl.total > 1 ? `字源 (${bl.n} of ${bl.total}) · zh.Wiktionary` : ZH_T[0], ZH_T[1]);
+      b.append(prose(bl.prose, ZH_BASE, "zh"));
+      if (bl.refs) b.append(el("div", { class: "refs", lang: "zh" }, "References", clean(bl.refs, ZH_BASE)));
+      frag.append(b);
+    }
+    return frag;
+  }
+
+  const SW_T = ["說文解字 · via zh.Wikisource", "Classical text"];
   const JUAN = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二", "十三", "十四", "十五"];
   function swText(p) {
     const n = document.importNode(p, true);
@@ -726,7 +810,7 @@ details .forms { margin: 0 0 6px; }
   function renderSw(r, ch) {
     const b = srcBlock(...SW_T);
     if (r.unavailable) {
-      b.append(el("p", { class: "muted", text: "The 說文解字 index (data/shuowen_index.json) didn't load." }));
+      b.append(el("p", { class: "muted", text: "The 說文解字 index didn't load, so this entry can't be located." }));
       return b;
     }
     if (r.none) {
@@ -741,24 +825,42 @@ details .forms { margin: 0 0 6px; }
     return b;
   }
 
-  function extrasFor(ch) {
-    const wrap = el("div", { class: "extras" });
-    const loading = (title, type) => {
-      const s = srcBlock(title, type);
+  // Modern dictionaries: link only (their text is under restrictive terms).
+  function dictCard(ch, kyu) {
+    const b = srcBlock("Read in the original", "Modern dictionaries · link only");
+    b.classList.add("wide");
+    const ul = el("ul", { class: "dictlinks" });
+    for (const s of SOURCES.filter(x => x.dict)) {
+      const c = s.trad && kyu ? kyu : ch;
+      ul.append(el("li", {},
+        el("a", { href: s.url(c), target: "_blank", rel: "noopener", text: c === ch ? s.label : `${s.label} (${c})` }),
+        el("div", { class: "by", text: s.note })));
+    }
+    b.append(ul);
+    return b;
+  }
+
+  function extrasFor(ch, kyu) {
+    const grid = el("div", { class: "accounts" });
+    const wrap = el("div", { class: "extras" }, el("h3", { text: "Other accounts" }), grid);
+    const loading = (title, kind) => {
+      const s = srcBlock(title, kind);
       s.append(el("p", { class: "muted", text: "Loading…" }));
       return s;
     };
-    const run = ([title, type], load, render) => {
-      let cur = loading(title, type);
-      wrap.append(cur);
+    const run = ([title, kind], load, render) => {
+      let cur = loading(title, kind);
+      grid.append(cur);
       const go = () => load().then(d => cur.replaceWith(render(d))).catch(err => {
-        const f = failed(title, type, err, () => { const l = loading(title, type); f.replaceWith(l); cur = l; go(); });
+        const f = failed(title, kind, err, () => { const l = loading(title, kind); f.replaceWith(l); cur = l; go(); });
         cur.replaceWith(f);
       });
       go();
     };
-    run(JA_T, () => lookupJa(ch), d => renderJa(d, ch));
     run(SW_T, () => shuowenFor(ch), r => renderSw(r, ch));
+    run(JA_T, () => lookupJa(ch), d => renderJa(d, ch));
+    run(ZH_T, () => lookupZh(ch), d => renderZh(d, ch));
+    grid.append(dictCard(ch, kyu));
     return wrap;
   }
 
@@ -773,7 +875,7 @@ details .forms { margin: 0 0 6px; }
     box.append(head);
     box.append(renderKD(kd));
     if (note) box.append(note);
-    const finish = () => { box.append(extrasFor(ch)); return box; };
+    const finish = () => { box.append(extrasFor(ch, data.kyujitai)); return box; };
 
     if (data.missing) {
       box.append(el("p", { class: "muted", text: `English Wiktionary has no entry for ${ch}.` }));
@@ -789,8 +891,8 @@ details .forms { margin: 0 0 6px; }
     if (!anyTable && !data.kyujitai) box.append(el("p", { class: "muted", text: "Wiktionary has no historical-forms table for this character." }));
 
     for (const b of data.blocks) {
-      const label = b.total > 1 ? `${b.lang}, ${b.heading} (${b.n} of ${b.total})` : `${b.lang}, ${b.heading}`;
-      const blk = el("div", { class: "block" }, el("h3", { text: label }));
+      const label = (b.total > 1 ? `${b.lang}, ${b.heading} (${b.n} of ${b.total})` : `${b.lang}, ${b.heading}`) + " · English Wiktionary";
+      const blk = el("div", { class: "block" }, el("h3", {}, el("span", { class: "chip", text: "Crowd-sourced" }), label));
       if (b.forms) blk.append(renderForms(b.forms));
       if (b.prose.length) {
         const pr = el("div", { class: "prose" });
