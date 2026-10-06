@@ -1,0 +1,11 @@
+name = "kanji-kp"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+ALLOWED_ORIGIN = "https://scottjb814.github.io"
+
+[observability]
+enabled = false
+
+# KP_TOKEN is a secret, not set here:  npx wrangler secret put KP_TOKEN
