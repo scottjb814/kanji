@@ -199,6 +199,11 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
 .credits .cr-body strong { color: var(--ink); font-weight: 600; }
 .moe { font: 17px/1.8 var(--mincho); }
 .moeimg { height: 1.4em; width: auto; vertical-align: middle; filter: var(--glyph-filter); }
+.kp { font: 17px/1.8 var(--mincho); }
+.kpimg { height: 1.4em; width: auto; vertical-align: middle; filter: var(--glyph-filter); }
+.kpset { display: grid; gap: 8px; margin: 8px 0 0; }
+.kpset input { font: 15px var(--ui); padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); min-width: 0; width: 100%; box-sizing: border-box; }
+.kpset .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
 .status { padding: 24px 0; color: var(--muted); }
 .empty { color: var(--muted); padding: 30px 0; }
@@ -236,6 +241,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
   說文解字 text and seal-script images: <a href="https://zh.wikisource.org/wiki/%E8%AA%AA%E6%96%87%E8%A7%A3%E5%AD%97" target="_blank" rel="noopener">Chinese Wikisource</a>
   (the work is in the public domain; the transcription is a Wikimedia contribution, CC BY-SA unless a page says otherwise).
   Form images come from <a href="https://commons.wikimedia.org/" target="_blank" rel="noopener">Wikimedia Commons</a>; each entry's "Image credits" lists their licences.
+  <span id="kpfoot" hidden>なりたち text: <a href="https://www.kanjipedia.jp/" target="_blank" rel="noopener">漢字ペディア</a>, 公益財団法人 日本漢字能力検定協会 (from 角川新字源), fetched live through a private proxy for the site owner; nothing is stored.</span>
   <span id="moefoot" hidden>字樣說明 text: 教育部《<a href="https://dict.variants.moe.edu.tw/" target="_blank" rel="noopener">異體字字典</a>》, Ministry of Education, Taiwan.</span>
 </footer>
 
@@ -879,6 +885,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
     };
     run(SW_T, () => shuowenFor(ch), r => renderSw(r, ch));
     if (MOE_INLINE) run(MOE_T, () => lookupMoe(ch), r => renderMoe(r, ch));
+    if (KP_INLINE) run(KP_T, () => lookupKp(ch), r => renderKp(r, ch));
     run(JA_T, () => lookupJa(ch), d => renderJa(d, ch));
     run(ZH_T, () => lookupZh(ch), d => renderZh(d, ch));
     grid.append(dictCard(ch, kyu));
@@ -1071,6 +1078,91 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
     return b;
   }
   if (MOE_INLINE) $("#moefoot").hidden = false;
+
+  // ---------- Kanjipedia なりたち, through the owner's private proxy ----------
+  // Kanjipedia (© 日本漢字能力検定協会) publishes no reuse terms I could find and
+  // sends no CORS headers, so the page can't read it directly. A small
+  // Cloudflare Worker (worker/ in the repo) fetches one entry live for one
+  // person, holds nothing, and returns only the なりたち paragraph. It answers
+  // only requests that carry the owner's token. The Worker address and token
+  // are typed in once and kept in this browser's localStorage; they are not in
+  // this file. Set KP_INLINE to false to remove the card.
+  const KP_INLINE = true;
+  const KP_KEY = "kanji-lookup:kp";
+  const KP_T = ["なりたち · Kanjipedia, via private proxy", "Modern dictionary"];
+  let kpCfg = null;
+  try {
+    const v = JSON.parse(localStorage.getItem(KP_KEY) || "null");
+    if (v && typeof v.url === "string" && typeof v.token === "string") kpCfg = v;
+  } catch { /* no storage: ask again each visit */ }
+  function kpSave(cfg) {
+    kpCfg = cfg;
+    try { cfg ? localStorage.setItem(KP_KEY, JSON.stringify(cfg)) : localStorage.removeItem(KP_KEY); } catch { /* memory only */ }
+  }
+  const kpCache = new Map();
+  function lookupKp(ch) {
+    if (!kpCfg) return Promise.resolve({ unconfigured: true });
+    if (!kpCache.has(ch)) {
+      const pr = fetch(`${kpCfg.url.replace(/\/+$/, "")}/kp?c=${encodeURIComponent(ch)}`,
+        { headers: { Authorization: `Bearer ${kpCfg.token}` }, cache: "no-store" })
+        .then(async r => {
+          if (r.status === 401) return { denied: true };
+          if (!r.ok) throw new Error(`the proxy returned HTTP ${r.status}`);
+          return r.json();
+        });
+      pr.then(v => { if (v.denied) kpCache.delete(ch); }, () => kpCache.delete(ch));
+      kpCache.set(ch, pr);
+    }
+    return kpCache.get(ch);
+  }
+  // Replace a card with a loading card, then with the result (or an error card).
+  function kpLoadInto(cur, ch) {
+    const l = srcBlock(...KP_T);
+    l.append(el("p", { class: "muted", text: "Loading…" }));
+    cur.replaceWith(l);
+    lookupKp(ch).then(d => l.replaceWith(renderKp(d, ch)))
+      .catch(e => { const f = failed(...KP_T, e, () => kpLoadInto(f, ch)); l.replaceWith(f); });
+  }
+  function renderKp(r, ch) {
+    const b = srcBlock(...KP_T);
+    const form = (msg) => {
+      const url = el("input", { type: "url", placeholder: "https://kanji-kp.<you>.workers.dev", "aria-label": "Proxy address", autocomplete: "off", spellcheck: "false" });
+      const tok = el("input", { type: "password", placeholder: "Token", "aria-label": "Token", autocomplete: "off" });
+      const go = el("button", { type: "button", text: "Connect" });
+      go.addEventListener("click", () => {
+        const u = url.value.trim(), t = tok.value.trim();
+        if (!/^https:\/\//.test(u) || !t) return;
+        kpCache.clear();
+        kpSave({ url: u, token: t });
+        kpLoadInto(b, ch);
+      });
+      b.append(el("p", { class: "muted", text: msg }), el("div", { class: "kpset" }, url, tok, el("div", { class: "row" }, go)));
+    };
+    if (r.unconfigured) { form("Not connected. Enter the proxy address and token to show なりたち here."); return b; }
+    if (r.denied) { form("The proxy rejected the token. Enter it again."); return b; }
+    if (!r.found || !r.naritachi) {
+      b.append(el("p", { class: "muted", text: !r.found
+        ? `Kanjipedia has no entry for ${ch}.` : `Kanjipedia's entry for ${ch} has no なりたち.` }));
+    } else {
+      const body = el("div", { class: "kp", lang: "ja" });
+      for (const p of r.naritachi.parts) {
+        if (p.t !== undefined) body.append(document.createTextNode(p.t));
+        else if (/^https:\/\/www\.kanjipedia\.jp\/common\/images\/naritachi\//.test(p.img || ""))
+          body.append(el("img", { class: "kpimg", src: p.img, alt: "", loading: "lazy" }));
+      }
+      b.append(body);
+      if (r.shown && r.shown !== ch) b.append(el("p", { class: "muted", text: `Kanjipedia files ${ch} under ${r.shown}.` }));
+    }
+    const note = el("p", { class: "srcnote" }, (r.naritachi && r.naritachi.source ? r.naritachi.source + " · " : "漢字ペディア · "));
+    if (r.url && /^https:\/\/www\.kanjipedia\.jp\/kanji\/\d+$/.test(r.url))
+      note.append(el("a", { href: r.url, target: "_blank", rel: "noopener", text: "open the entry" }), " · ");
+    const off = el("button", { type: "button", class: "retry", text: "Disconnect" });
+    off.addEventListener("click", () => { kpCache.clear(); kpSave(null); b.replaceWith(renderKp({ unconfigured: true }, ch)); });
+    note.append(off);
+    b.append(note);
+    return b;
+  }
+  if (KP_INLINE) $("#kpfoot").hidden = false;
 
   // ---------- Rendering ----------
   function renderEntry(ch, data, { secondary = false, note = null, kd = null } = {}) {
