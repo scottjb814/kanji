@@ -33,7 +33,7 @@ jobs:
         run: python3 scripts/build_kanjidic.py _site/data/kanjidic.json
 
       - name: Assemble site
-        run: cp index.html _site/
+        run: cp index.html _site/ && cp data/shuowen_index.json _site/data/
 
       - uses: actions/configure-pages@v5
 
