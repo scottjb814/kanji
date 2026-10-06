@@ -534,7 +534,16 @@ details .forms { margin: 0 0 6px; }
     { label: "CUHK", trad: true,
       url: c => `https://humanum.arts.cuhk.edu.hk/Lexis/lexi-mf/search.php?word=${encodeURIComponent(c)}` },
     { label: "Kanjipedia",
-      url: c => `https://www.kanjipedia.jp/search?k=${encodeURIComponent(c)}&kt=1&sk=leftHand` }
+      url: c => `https://www.kanjipedia.jp/search?k=${encodeURIComponent(c)}&kt=1&sk=leftHand` },
+    // Kotobank carries 普及版 字通; the fragment jumps to that dictionary's
+    // section (Kotobank's own anchor; if a character has no 字通 entry the
+    // page simply opens at the top).
+    { label: "字通",
+      url: c => `https://kotobank.jp/word/${encodeURIComponent(c)}#E6.99.AE.E5.8F.8A.E7.89.88.20.E5.AD.97.E9.80.9A` },
+    // Taiwan MOE 異體字字典. Entry URLs use internal numeric IDs, so link to
+    // its GET search. It finds shinjitai too (学 is listed under 學).
+    { label: "MOE 異體字",
+      url: c => `https://dict.variants.moe.edu.tw/search.jsp?QTP=0&WORD=${encodeURIComponent(c)}` }
   ];
   function sourceLinks(ch, kyu) {
     const box = el("div", { class: "links" });
