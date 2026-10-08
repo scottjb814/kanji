@@ -202,7 +202,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
 .kp { font: 17px/1.8 var(--mincho); }
 .kpimg { height: 1.4em; width: auto; vertical-align: middle; filter: var(--glyph-filter); }
 .kpset { display: grid; gap: 8px; margin: 8px 0 0; }
-.kpset input { font: 15px var(--ui); padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); min-width: 0; width: 100%; box-sizing: border-box; }
+.kpset input { font: 15px var(--ui); padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--ink); min-width: 0; width: 100%; box-sizing: border-box; }
 .kpset .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .brush .cr-body > p { margin: 0 0 8px; }
 .form.brush .txt { font-size: 52px; line-height: 76px; font-weight: 400; }
@@ -517,9 +517,23 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
   function glyphImg(src) {
     const img = el("img", { src: imgUrl(src), alt: "", loading: "lazy", decoding: "async", referrerpolicy: "strict-origin-when-cross-origin" });
     img.addEventListener("error", () => {
-      if (img.dataset.retried) { img.replaceWith(el("div", { class: "missing", text: "image unavailable" })); return; }
-      img.dataset.retried = "1";
-      img.src = img.src.replace("//thumb.wikimedia.org/", "//upload.wikimedia.org/");
+      if (!img.dataset.retried) {
+        img.dataset.retried = "1";
+        try {
+          const url = new URL(img.src);
+          if (url.hostname === "upload.wikimedia.org" && url.pathname.startsWith("/wikipedia/commons/thumb/")) {
+            const parts = url.pathname.split("/");
+            if (parts.length >= 8) {
+              parts.splice(3, 1); // remove "thumb"
+              parts.pop();       // remove the thumbnail filename
+              url.pathname = parts.join("/");
+              img.src = url.href;
+              return;
+            }
+          }
+        } catch { /* malformed image URL */ }
+      }
+      img.replaceWith(el("div", { class: "missing", text: "image unavailable" }));
     });
     return img;
   }
@@ -1265,7 +1279,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
 
   // ---------- Rendering ----------
   function renderEntry(ch, data, { secondary = false, note = null, kd = null } = {}) {
-    const box = el("section", { class: "entry" + (secondary ? " secondary" : ""), lang: "en" });
+    const box = el("section", { class: "entry" + (secondary ? " secondary" : ""), lang: "en", "data-kanji": ch });
     const head = el("div", { class: "head" },
       el("div", { class: "seal", lang: "ja", text: ch, "aria-hidden": "true" }),
       el("div", {},
@@ -1274,7 +1288,9 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
           saveButton(ch)),
         sourceLinks(ch, data.kyujitai)));
     box.append(head);
-    box.append(renderKD(kd));
+    const kdSlot = el("div", { class: "kd-slot" });
+    if (kd) kdSlot.append(renderKD(kd));
+    box.append(kdSlot);
     if (note) box.append(note);
     const finish = () => {
       if (BRUSH_INLINE) box.append(brushFor(ch));
@@ -1328,35 +1344,51 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
     current = ch;
     const id = ++reqId;
     [...charsBar.children].forEach(b => b.setAttribute("aria-pressed", String(b.dataset.k === ch)));
-    out.replaceChildren(el("div", { class: "status", text: `Looking up ${ch}…` }));
+    out.replaceChildren(el("div", { class: "status", text: "Looking up " + ch + "…" }));
+
+    // KANJIDIC is supplementary. Render Wiktionary without waiting for its
+    // (potentially large) JSON download, and hydrate readings when it arrives.
+    let kdData = null;
+    const fillKD = data => {
+      if (id !== reqId || !data) return;
+      for (const entry of out.querySelectorAll(".entry[data-kanji]")) {
+        const c = entry.dataset.kanji;
+        const slot = entry.querySelector(".kd-slot");
+        if (slot) slot.replaceChildren(renderKD(data[c] || data[c.normalize("NFC")]));
+      }
+    };
+    loadKD().then(data => { kdData = data; fillKD(data); });
+
     try {
-      const [data, kdc] = await Promise.all([lookup(ch), loadKD()]);
+      const data = await lookup(ch);
       if (id !== reqId) return;
-      const kdFor = c => (kdc && (kdc[c] || kdc[c.normalize("NFC")])) || null;
       const nodes = [];
       let kyu = null;
       if (!data.missing && data.kyujitai) {
         kyu = data.kyujitai;
         const note = el("p", { class: "note" },
-          `Japanese shinjitai (new form). Its kyūjitai (traditional form) is `,
+          "Japanese shinjitai (new form). Its kyūjitai (traditional form) is ",
           el("a", { href: wiktUrl(kyu), class: "k", "data-k": kyu, lang: "ja", text: kyu }),
           ". The traditional form's history is shown below.");
-        nodes.push(renderEntry(ch, data, { note, kd: kdFor(ch) }));
+        nodes.push(renderEntry(ch, data, { note }));
       } else {
-        nodes.push(renderEntry(ch, data, { kd: kdFor(ch) }));
+        nodes.push(renderEntry(ch, data));
       }
       out.replaceChildren(...nodes);
+      fillKD(kdData);
+
       if (kyu) {
-        const pending = el("div", { class: "status", text: `Looking up ${kyu}…` });
+        const pending = el("div", { class: "status", text: "Looking up " + kyu + "…" });
         out.append(pending);
         const k = await lookup(kyu);
         if (id !== reqId) return;
-        pending.replaceWith(renderEntry(kyu, { ...k, kyujitai: null }, { secondary: true, kd: kdFor(kyu) }));
+        pending.replaceWith(renderEntry(kyu, { ...k, kyujitai: null }, { secondary: true }));
+        fillKD(kdData);
       }
     } catch (e) {
       if (id !== reqId) return;
       out.replaceChildren(el("div", { class: "status" },
-        el("p", { text: `Couldn't load ${ch} from Wiktionary: ${e.message}.` }),
+        el("p", { text: "Couldn't load " + ch + " from Wiktionary: " + e.message + "." }),
         el("p", {}, "Check your connection, then tap the character again, or ",
           el("a", { href: wiktUrl(ch), target: "_blank", rel: "noopener", text: "open Wiktionary directly" }), ".")));
     }
@@ -1366,6 +1398,11 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
     const chars = [...new Set(text.match(HAN_G) || [])];
     charsBar.replaceChildren();
     if (!chars.length) {
+      // Invalidate pending lookups so an older response cannot overwrite this
+      // message. Keep the URL in sync for Back/Forward navigation.
+      current = null;
+      ++reqId;
+      updateUrl(text, null, push);
       out.replaceChildren(el("div", { class: "empty" }, el("p", { text: "No kanji found in that input. Paste one or more kanji and try again." })));
       return;
     }
@@ -1423,7 +1460,20 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
   function fromUrl() {
     const u = new URL(location.href);
     const t = u.searchParams.get("q");
-    if (t) { q.value = t; setQuery(t, { pick: u.searchParams.get("c"), push: false }); }
+    if (t) {
+      q.value = t;
+      setQuery(t, { pick: u.searchParams.get("c"), push: false });
+      return;
+    }
+    // A URL with no query is a real navigation state, not an instruction to
+    // leave the previous results visible.
+    q.value = "";
+    current = null;
+    ++reqId;
+    charsBar.replaceChildren();
+    out.replaceChildren(el("div", { class: "empty" },
+      el("p", { text: "Paste a kanji or a compound to see its historical forms and glyph origin from Wiktionary, with the 說文解字 entry where there is one." }),
+      el("p", { text: "Tap a dotted character in an explanation to look it up." })));
   }
   window.addEventListener("popstate", fromUrl);
   renderSaved();
