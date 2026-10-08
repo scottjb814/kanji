@@ -1,25 +1,54 @@
 # Kanjipedia proxy (private)
 
-One Cloudflare Worker that fetches the なりたち paragraph of a single Kanjipedia
-entry on request, for one person. It stores nothing, caches nothing, and answers
-only requests that carry a secret token from the allowed origin.
+This optional Cloudflare Worker retrieves one なりたち entry on demand and
+returns structured text plus approved glyph-image URLs. GitHub Pages stays
+unchanged. The Worker requires a secret token and does not persist or cache
+dictionary content.
 
-## Set up (Cloudflare dashboard, no command line)
+## Set up or update
 
-1. Workers & Pages > Create > Worker. Name it `kanji-kp`, deploy the starter, then Edit code.
-2. Replace the code with the contents of `worker.js` and deploy.
-3. Settings > Variables and Secrets:
-   - `ALLOWED_ORIGIN` (Text) = `https://scottjb814.github.io`
-   - `KP_TOKEN` (Secret) = a long random string (32+ characters; a password manager will generate one)
-4. Check: opening `https://kanji-kp.<your-subdomain>.workers.dev/kp?c=牛` in a browser should show `{"error":"unauthorized"}`.
-5. On the page, open any character, find the Kanjipedia card, paste the Worker address and the token, press Connect.
+1. In Cloudflare Workers, create or open `kanji-kp`.
+2. Copy `worker/worker.js` into the Worker editor and deploy that code. A GitHub
+   commit **does not** automatically deploy the Cloudflare Worker.
+3. In Cloudflare's settings, configure:
+   - `ALLOWED_ORIGIN` (text): `https://scottjb814.github.io`
+   - `KP_TOKEN` (secret): a random token of at least 32 characters.
+4. In the site, provide your Worker URL and token when prompted. They remain
+   in your browser's localStorage; never commit or post the token.
+5. Without sending a token, visiting the Worker endpoint should return
+   HTTP 401. This is only a basic authentication check, not a complete test.
 
-## Behaviour (tested against saved Kanjipedia pages)
+For Wrangler-based deployment, `worker/wrangler.toml` is included, but the
+GitHub Pages workflow does not deploy this Worker.
 
-- Requests without the token get 401 and cause no request to Kanjipedia.
-- Browsers from any other origin get 403.
-- One kanji per request; anything else gets 400.
-- Two live requests to kanjipedia.jp per lookup (search, then entry page); response is `Cache-Control: no-store`.
-- Returns only: the なりたち text (with any glyph-image URLs), its 出典 line, and the entry URL.
+## Matching and safe failures
 
-To switch it off: set `KP_INLINE = false` in `index.html`, and delete the Worker.
+- Prefix-search results are checked for an **exact visible-character match**.
+  The first search link is never trusted without verification.
+- The entry's own title must match the requested character. A mismatch returns
+  HTTP 502 with `entry_mismatch`; no other character's explanation is shown.
+- The parser keeps only text and images under Kanjipedia's
+  `/common/images/naritachi/` path. All other markup is discarded.
+- Missing なりたち returns a successful result with `naritachi: null`.
+  A malformed recognizable なりたち block returns HTTP 502 with `parse`.
+- Upstream errors return HTTP 502 (`upstream`) and timeouts return HTTP 504
+  (`timeout`), without echoing upstream HTML or internal exception details.
+- Origin checks restrict browser use; the bearer token supplies authentication
+  because non-browser clients can forge the Origin header.
+- Nothing is cached or stored on the server. Requests are made only after
+  successful authentication and one-character input validation.
+
+## Testing
+
+Run `node --test tests/worker.test.mjs` locally. GitHub Actions runs these
+network-free regression tests on pull requests.
+
+The fixtures are synthetic and include no copied dictionary entries. They
+cover search-result ordering, lookalike characters, parser layout variants,
+authentication, timeouts, malformed responses and misattributed results.
+Because Kanjipedia has no documented API, successful fixture tests **do not**
+guarantee that current live pages still use compatible HTML. Smoke-test a few
+lookup characters manually after deploying a Worker update.
+
+To disable inline access, set `KP_INLINE = false` in `index.html` and
+remove the Worker after confirming it is no longer needed.
