@@ -33,3 +33,6 @@ jobs:
         run: npm install --no-save --no-package-lock --ignore-scripts linkedom@0.18.12
       - name: Test Wiktionary section discovery and image identity
         run: node --test tests/historical.spec.mjs
+      - name: Temporary live Wiktionary compatibility probe
+        continue-on-error: true
+        run: node tests/live-wiktionary-forms.mjs
