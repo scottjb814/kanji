@@ -29,3 +29,7 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_*.py' -v
       - name: Test Kanjipedia parser
         run: node --test tests/*.test.mjs
+      - name: Install test-only HTML parser
+        run: npm install --no-save --no-package-lock --ignore-scripts linkedom@0.18.12
+      - name: Test Wiktionary section discovery and image identity
+        run: node --test tests/historical.spec.mjs
