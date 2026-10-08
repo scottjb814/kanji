@@ -41,7 +41,10 @@ GitHub Pages workflow does not deploy this Worker.
 ## Testing
 
 Run `node --test tests/worker.test.mjs` locally. GitHub Actions runs these
-network-free regression tests on pull requests.
+network-free regression tests on pull requests. For a manual, read-only live
+compatibility probe, run `node tests/live-kanjipedia-smoke.mjs` from the
+repository root. That script makes four requests for 討 and 学, prints only
+pass/fail metadata, and is intentionally not part of routine CI.
 
 The fixtures are synthetic and include no copied dictionary entries. They
 cover search-result ordering, lookalike characters, parser layout variants,
