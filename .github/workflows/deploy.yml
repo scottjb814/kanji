@@ -29,6 +29,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Regression tests
+        run: |
+          python3 -m unittest discover -s tests -p 'test_*.py'
+          node --test tests/*.test.mjs
+
       - name: Build KANJIDIC2 data
         run: python3 scripts/build_kanjidic.py _site/data/kanjidic.json
 
