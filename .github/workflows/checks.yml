@@ -29,5 +29,3 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_*.py' -v
       - name: Test Kanjipedia parser
         run: node --test tests/*.test.mjs
-      - name: Temporary live Kanjipedia smoke check (remove after run)
-        run: node tests/live-kanjipedia-smoke.mjs
