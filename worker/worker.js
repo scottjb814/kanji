@@ -54,41 +54,85 @@ const decode = s =>
     return { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " }[e];
   });
 
-// The paragraph is text plus the odd <img> for a glyph that has no Unicode
-// code point. Keep exactly those two things: {t: text} and {img: absolute url}.
+// Parse only the tiny subset of HTML that we actually need. Cloudflare Workers
+// do not offer a DOMParser, and Kanjipedia does not have a documented API.
+// Always require an exact headword match before following a search result.
+const textOnly = html => decode(html.replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim();
+const normalized = c => c.normalize("NFC");
+
+export function findExactEntry(html, char) {
+  const wanted = normalized(char);
+  const anchors = /<a\b([^>]*)>([\s\S]*?)<\/a\s*>/gi;
+  let match;
+  while ((match = anchors.exec(html))) {
+    const href = match[1].match(/\bhref\s*=\s*(["'])(\/kanji\/[0-9]+)\1/i);
+    if (!href) continue;
+    // A prefix search can return a completely different headword first.
+    // Compare the visible anchor text instead of trusting result order.
+    if (normalized(textOnly(match[2])) === wanted) return KP + href[2];
+  }
+  return null;
+}
+
+export function entryHeadword(html) {
+  const match = html.match(/<title\b[^>]*>([\s\S]*?)<\/title\s*>/i);
+  return match ? normalized(textOnly(match[1]).split(/[|｜]/)[0].trim()) : null;
+}
+
+// The paragraph is text plus occasional images for non-Unicode glyphs.
+// Never pass through HTML from the third-party site to our browser.
 export function parseNaritachi(html) {
-  const li = html.match(/<li class="naritachi">([\s\S]*?)<\/li>/);
-  if (!li) return null;
-  const block = li[1];
-  const src = block.match(/<div class="hArea">[\s\S]*?<p>([\s\S]*?)<\/p>/);
-  const body = block.match(/<\/div>\s*<div>\s*<p>([\s\S]*?)<\/p>/);
+  const open = /<li\b[^>]*\bclass\s*=\s*(["'])(?:(?!\1)[\s\S])*?\bnaritachi\b(?:(?!\1)[\s\S])*?\1[^>]*>/i.exec(html);
+  if (!open) return null;
+  const end = html.indexOf("</li>", open.index + open[0].length);
+  if (end === -1) return null;
+  const block = html.slice(open.index + open[0].length, end);
+  const src = block.match(/<div\b[^>]*\bclass\s*=\s*(["'])[^"']*\bhArea\b[^"']*\1[^>]*>[\s\S]*?<p\b[^>]*>([\s\S]*?)<\/p>/i);
+  const body = block.match(/<\/div>\s*<div\b[^>]*>\s*<p\b[^>]*>([\s\S]*?)<\/p>/i);
   if (!body) return null;
   const parts = [];
-  const re = /<img[^>]*?src="(\/common\/images\/naritachi\/[A-Za-z0-9_.-]+)"[^>]*>|<[^>]+>|([^<]+)/g;
+  const re = /<img\b[^>]*>|<[^>]+>|([^<]+)/gi;
   let m;
   while ((m = re.exec(body[1]))) {
-    if (m[1]) parts.push({ img: KP + m[1] });
-    else if (m[2] !== undefined) {
-      const t = decode(m[2]).replace(/\s+/g, " ");
-      if (t.trim() || (parts.length && t)) parts.push({ t });
+    if (/^<img\b/i.test(m[0])) {
+      const attr = m[0].match(/\bsrc\s*=\s*(["'])(\/common\/images\/naritachi\/[A-Za-z0-9_.-]+)\1/i);
+      if (attr) parts.push({ img: KP + attr[2] });
+    } else if (m[1] !== undefined) {
+      const txt = decode(m[1]).replace(/\s+/g, " ");
+      if (txt) {
+        const prev = parts[parts.length - 1];
+        if (prev && prev.t !== undefined) prev.t += txt;
+        else parts.push({ t: txt });
+      }
     }
   }
   while (parts.length && parts[0].t !== undefined && !parts[0].t.trim()) parts.shift();
-  const last = parts[parts.length - 1];
-  if (last && last.t !== undefined) last.t = last.t.replace(/\s+$/, "");
-  const first = parts[0];
-  if (first && first.t !== undefined) first.t = first.t.replace(/^\s+/, "");
-  const source = src ? decode(src[1].replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim() : "";
-  return parts.length ? { source, parts } : null;
+  while (parts.length && parts.at(-1).t !== undefined && !parts.at(-1).t.trim()) parts.pop();
+  if (parts[0]?.t !== undefined) parts[0].t = parts[0].t.trimStart();
+  if (parts.at(-1)?.t !== undefined) parts.at(-1).t = parts.at(-1).t.trimEnd();
+  return parts.length ? { source: src ? textOnly(src[2]) : "", parts } : null;
 }
 
+const REQUEST_TIMEOUT_MS = 10000;
+
 async function get(url) {
-  const r = await fetch(url, {
-    headers: { "user-agent": UA, accept: "text/html", "accept-language": "ja" },
-    cf: { cacheTtl: 0, cacheEverything: false },
-  });
-  if (!r.ok) throw Object.assign(new Error(`kanjipedia ${r.status}`), { upstream: r.status });
-  return r.text();
+  let r;
+  try {
+    r = await fetch(url, {
+      headers: { "user-agent": UA, accept: "text/html", "accept-language": "ja" },
+      cf: { cacheTtl: 0, cacheEverything: false },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (err) {
+    const timeout = err?.name === "TimeoutError" || err?.name === "AbortError";
+    throw Object.assign(new Error(timeout ? "timeout" : "upstream"), { kind: timeout ? "timeout" : "upstream" });
+  }
+  if (!r.ok) throw Object.assign(new Error("upstream"), { kind: "upstream" });
+  try {
+    return await r.text();
+  } catch {
+    throw Object.assign(new Error("upstream"), { kind: "upstream" });
+  }
 }
 
 export default {
@@ -114,17 +158,32 @@ export default {
 
     try {
       const q = encodeURIComponent(c);
-      const search = await get(`${KP}/search?k=${q}&kt=1&sk=leftHand`);
-      const hit = search.match(/href="(\/kanji\/\d+)"/);
-      if (!hit) return json({ found: false, char: c }, 200, okOrigin);
-      const entryUrl = KP + hit[1];
+      const search = await get(KP + "/search?k=" + q + "&kt=1&sk=leftHand");
+      const entryUrl = findExactEntry(search, c);
+      if (!entryUrl) {
+        // If a page claims results but has no recognizable entries, do not
+        // confuse an upstream markup change with "this kanji does not exist".
+        if (/漢字一字\s*[：:]\s*[1-9]/.test(textOnly(search)) &&
+            !/<a\b[^>]*\bhref\s*=\s*["']\/kanji\/[0-9]+["']/i.test(search)) {
+          return json({ error: "search_format" }, 502, okOrigin);
+        }
+        return json({ found: false, char: c }, 200, okOrigin);
+      }
       const page = await get(entryUrl);
-      const shown = (page.match(/<title>\s*(.*?)\s*[|｜]/s) || [])[1] || c;
-      const n = parseNaritachi(page);
-      if (!n) return json({ found: true, char: c, shown, url: entryUrl, naritachi: null }, 200, okOrigin);
-      return json({ found: true, char: c, shown, url: entryUrl, naritachi: n }, 200, okOrigin);
-    } catch (e) {
-      return json({ error: "upstream", detail: e.upstream || String(e.message || e) }, 502, okOrigin);
+      const shown = entryHeadword(page);
+      // Fail closed: a redirect or bad search result must never be attributed
+      // to another character (traditional/modern forms can have distinct URLs).
+      if (!shown || shown !== normalized(c)) {
+        return json({ error: "entry_mismatch" }, 502, okOrigin);
+      }
+      const naritachi = parseNaritachi(page);
+      if (!naritachi && /<li\b[^>]*\bnaritachi\b/i.test(page)) {
+        return json({ error: "parse" }, 502, okOrigin);
+      }
+      return json({ found: true, char: c, shown, url: entryUrl, naritachi }, 200, okOrigin);
+    } catch (err) {
+      const kind = err?.kind === "timeout" ? "timeout" : "upstream";
+      return json({ error: kind }, kind === "timeout" ? 504 : 502, okOrigin);
     }
   },
 };
