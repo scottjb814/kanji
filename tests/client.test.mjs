@@ -82,3 +82,41 @@ test('Wikimedia thumbnail error retries the original file, then gives up', () =>
   img.listeners.error();
   assert.equal(img.replacement.attrs.class, 'missing');
 });
+
+
+function kpHarness(status, responseData) {
+  let calls = 0;
+  const ctx = {
+    kpCfg: { url: "https://example.workers.dev", token: "unit-test-secret" },
+    kpCache: new Map(),
+    fetch: async () => {
+      calls++;
+      return { status, ok: status >= 200 && status < 300, json: async () => responseData };
+    },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(section("  function lookupKp(", "  // Replace a card with a loading card"), ctx);
+  return { lookup: ch => ctx.lookupKp(ch), calls: () => calls };
+}
+
+test("Kanjipedia title mismatch displays a meaningful error and is retryable", async () => {
+  const h = kpHarness(502, { error: "entry_mismatch" });
+  await assert.rejects(h.lookup("学"), /different character/);
+  await assert.rejects(h.lookup("学"), /different character/);
+  assert.equal(h.calls(), 2);
+});
+
+test("Kanjipedia timeout displays a meaningful retryable error", async () => {
+  const h = kpHarness(504, { error: "timeout" });
+  await assert.rejects(h.lookup("討"), /too long to respond/);
+});
+
+test("Kanjipedia malformed success payload is rejected rather than shown as missing", async () => {
+  const h = kpHarness(200, { nonsense: true });
+  await assert.rejects(h.lookup("学"), /unexpected response/);
+});
+
+test("Kanjipedia invalid token is treated as a reconfiguration problem", async () => {
+  const h = kpHarness(401, { error: "unauthorized" });
+  assert.equal((await h.lookup("討")).denied, true);
+});
