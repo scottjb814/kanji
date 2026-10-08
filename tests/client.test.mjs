@@ -13,7 +13,7 @@ function section(first, last) {
 
 function node(tag, attrs = {}, ...children) {
   return {
-    tag, attrs, children, dataset: { k: attrs['data-k'] },
+    tag, attrs, children, src: attrs.src, dataset: { k: attrs['data-k'] },
     listeners: {},
     addEventListener(event, cb) { this.listeners[event] = cb; },
     replaceWith(value) { this.replacement = value; },
