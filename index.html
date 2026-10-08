@@ -1220,8 +1220,20 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
         { headers: { Authorization: `Bearer ${kpCfg.token}` }, cache: "no-store" })
         .then(async r => {
           if (r.status === 401) return { denied: true };
-          if (!r.ok) throw new Error(`the proxy returned HTTP ${r.status}`);
-          return r.json();
+          const data = await r.json().catch(() => null);
+          if (!r.ok) {
+            const messages = {
+              timeout: "Kanjipedia took too long to respond.",
+              upstream: "Kanjipedia is temporarily unavailable.",
+              search_format: "Kanjipedia's search results have changed; the character could not be verified.",
+              entry_mismatch: "Kanjipedia returned a different character, so its explanation was withheld.",
+              parse: "Kanjipedia's entry layout has changed; the explanation could not be read.",
+            };
+            throw new Error(messages[data?.error] || "The Kanjipedia proxy returned an error.");
+          }
+          if (!data || typeof data.found !== "boolean")
+            throw new Error("The Kanjipedia proxy returned an unexpected response.");
+          return data;
         });
       pr.then(v => { if (v.denied) kpCache.delete(ch); }, () => kpCache.delete(ch));
       kpCache.set(ch, pr);
