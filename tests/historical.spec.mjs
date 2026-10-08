@@ -63,7 +63,7 @@ test("same Commons file with different thumbnails deduplicates, retaining both s
   const zh = collect(root("<h2>漢語</h2>" + glyph("A.svg")), "zh");
   const merged = merge([en, zh]);
   assert.equal(merged.images.length, 1);
-  assert.deepEqual(merged.images[0].sources.map(s => s.edition), ["en", "zh"]);
+  assert.deepEqual(Array.from(merged.images[0].sources, s => s.edition), ["en", "zh"]);
   assert.equal(merged.records.length, 2);
 });
 
