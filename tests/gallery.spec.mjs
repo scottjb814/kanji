@@ -156,3 +156,18 @@ test("renderEntry positions one gallery before explanations and collapses the or
   assert.ok(entry.querySelector("details summary").textContent.includes("Original historical-form table"));
   assert.match(entry.querySelector(".block").textContent, /Source explanation/);
 });
+
+test("two citations from one Wiktionary edition use one chip with a section deep link", () => {
+  const f=fixture();
+  const im=image(f,"Forms.svg","Seal","Seal script", [
+    {edition:"en",sections:["Chinese","Glyph origin"],anchor:"Glyph_origin"},
+    {edition:"en",sections:["Translingual","Han character"],anchor:"Han_character"},
+    {edition:"ja",sections:["漢字","字源"],anchor:"字源"}
+  ]);
+  const gallery=f.ctx.renderHistorical("字",{images:[im]});
+  const sources=Array.from(gallery.querySelectorAll(".hg-sources a"));
+  assert.deepEqual(sources.map(x=>x.textContent),["EN (2)","JA"]);
+  assert.equal(sources[0].getAttribute("href"),"https://en.wiktionary.org/wiki/%E5%AD%97#Glyph_origin");
+  assert.match(sources[0].getAttribute("title"),/Translingual › Han character/);
+  assert.equal(sources[1].getAttribute("href"),"https://ja.wiktionary.org/wiki/%E5%AD%97#%E5%AD%97%E6%BA%90");
+});
