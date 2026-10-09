@@ -1,0 +1,74 @@
+name: One-off live Cloudflare Worker verification
+on:
+  push:
+    branches:
+      - diagnostics/live-worker-2026-10-08
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Verify public Worker contract without an authentication secret
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          const base = "https://kanji-kp.scottjb814.workers.dev";
+          const origin = "https://scottjb814.github.io";
+          let failures = 0;
+          async function check(name, path, options, expectedStatus, expectedError, expectedCors) {
+            try {
+              const r = await fetch(base + path, {
+                redirect: "manual",
+                signal: AbortSignal.timeout(12000),
+                ...options,
+              });
+              const contentType = r.headers.get("content-type") || "";
+              const raw = await r.text();
+              const parsed = raw ? JSON.parse(raw) : null;
+              assert.equal(r.status, expectedStatus, "HTTP status");
+              if (expectedError !== null) {
+                assert.ok(contentType.includes("application/json"), "JSON content type");
+                assert.equal(parsed?.error, expectedError, "response error code");
+                assert.equal(r.headers.get("cache-control"), "no-store", "no-store response");
+              }
+              const cors = r.headers.get("access-control-allow-origin");
+              assert.equal(cors, expectedCors, "CORS allow-origin header");
+              console.log("PASS " + name + " [" + r.status + ", CORS=" + (cors ?? "none") + "]");
+            } catch (e) {
+              failures++;
+              console.error("FAIL " + name + ": " + String(e.message || e));
+            }
+          }
+          await check("Unauthenticated allowed-origin lookup",
+            "/kp?c=%E7%89%9B", {headers:{origin}}, 401, "unauthorized", origin);
+          await check("Invalid bearer token",
+            "/kp?c=%E7%89%9B", {headers:{origin, authorization:"Bearer test-invalid-token-not-the-secret"}},
+            401,"unauthorized",origin);
+          await check("Disallowed browser origin",
+            "/kp?c=%E7%89%9B", {headers:{origin:"https://example.invalid"}},
+            403,"forbidden",null);
+          await check("Allowed origin OPTIONS preflight",
+            "/kp?c=%E7%89%9B",
+            {method:"OPTIONS",headers:{origin,"access-control-request-method":"GET","access-control-request-headers":"authorization"}},
+            204,null,origin);
+          await check("Disallowed origin OPTIONS preflight",
+            "/kp?c=%E7%89%9B",
+            {method:"OPTIONS",headers:{origin:"https://example.invalid","access-control-request-method":"GET"}},
+            204,null,null);
+          await check("Unknown path",
+            "/not-found", {headers:{origin}},404,"not found",origin);
+          await check("Unsupported method",
+            "/kp?c=%E7%89%9B",{method:"POST",headers:{origin}},404,"not found",origin);
+          await check("No-origin unauthenticated lookup",
+            "/kp?c=%E7%89%9B",{},401,"unauthorized",null);
+          if (failures) {
+            console.error(failures + " Worker contract checks failed.");
+            process.exitCode = 1;
+          } else {
+            console.log("PASS: 8 live token-free checks. Authenticated lookups are NOT verified by these tests.");
+          }
+          NODE
