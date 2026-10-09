@@ -61,6 +61,46 @@
     return !!table.querySelector("img") && SCRIPT_LABEL.test(text);
   }
 
+  // Derive labels from the same logical table column as the image, not from
+  // arbitrary headings elsewhere in a table (which could misdate the glyph).
+  function imageContext(img, table) {
+    const caption = img.closest(".gallerybox")?.querySelector(".gallerytext")?.textContent?.trim() || "";
+    const cell = img.closest("td,th");
+    const imageRow = cell?.closest("tr");
+    if (!cell || !imageRow || !table.contains(imageRow)) return caption;
+
+    const expanded = row => {
+      const result = [];
+      for (const c of row.children) {
+        if (!/^(TD|TH)$/.test(c.tagName)) continue;
+        const width = Math.min(24, Math.max(1, Number.parseInt(c.getAttribute("colspan") || "1", 10) || 1));
+        for (let i = 0; i < width; i++) result.push(c);
+      }
+      return result;
+    };
+    const index = expanded(imageRow).indexOf(cell);
+    const labels = [];
+    for (const row of table.querySelectorAll("tr")) {
+      if (row === imageRow) break;
+      const sameColumn = expanded(row)[index];
+      if (!sameColumn || sameColumn.tagName !== "TH") continue;
+      const label = sameColumn.textContent.trim().replace(/\s+/g, " ");
+      if (!label || label.length > 65 || HISTORICAL_CAPTION.test(label)) continue;
+      if (!labels.includes(label)) labels.push(label);
+    }
+    if (caption && caption.length < 90) labels.push(caption);
+    return labels.slice(-2).join(" · ");
+  }
+
+  function scriptGroup(context) {
+    if (/oracle.bone|甲骨|甲骨文/i.test(context)) return "Oracle bone";
+    if (/bronze|金文|金字|銅器|钟鼎/i.test(context)) return "Bronze";
+    if (/slip|bamboo|silk|楚簡|秦簡|简帛|簡帛/i.test(context)) return "Bamboo and silk";
+    if (/seal script|小篆|篆文|篆書|大篆/i.test(context)) return "Seal";
+    if (/clerical|隸書|隶书/i.test(context)) return "Clerical";
+    return "Other forms";
+  }
+
   function collect(root, edition = "en") {
     if (!root) return [];
     const output = [], stack = [];
@@ -79,7 +119,7 @@
         if (visited.has(table) || !isHistoricalTable(table, path)) continue;
         visited.add(table);
         const images = [...table.querySelectorAll("img")]
-          .map(img => ({ identity: imageIdentity(img), img }))
+          .map(img => ({ identity: imageIdentity(img), img, context: imageContext(img, table) }))
           .filter(item => item.identity);
         // Empty tables aren't evidence of glyph images. Historical text-only
         // cells remain eligible for the old renderer, but not image dedup.
@@ -97,8 +137,12 @@
       for (const item of record.images) {
         let found = byIdentity.get(item.identity);
         if (!found) {
-          found = { identity: item.identity, img: item.img, sources: [] };
+          found = { identity: item.identity, img: item.img, context: item.context, group: scriptGroup(item.context || ""), sources: [] };
           byIdentity.set(item.identity, found);
+        }
+        if (found.group === "Other forms" && scriptGroup(item.context || "") !== "Other forms") {
+          found.context = item.context;
+          found.group = scriptGroup(item.context);
         }
         const source = { edition: record.edition, sections: [...record.sections] };
         if (!found.sources.some(s => s.edition === source.edition && s.sections.join("\u001f") === source.sections.join("\u001f"))) {
@@ -109,5 +153,5 @@
     return { records, images: [...byIdentity.values()] };
   }
 
-  scope.KanjiHistoricalForms = Object.freeze({ collect, merge, imageIdentity, headingOf });
+  scope.KanjiHistoricalForms = Object.freeze({ collect, merge, imageIdentity, headingOf, imageContext, scriptGroup });
 })(globalThis);
