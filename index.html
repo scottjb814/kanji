@@ -1309,6 +1309,92 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
   }
   if (KP_INLINE) $("#kpfoot").hidden = false;
 
+  // ---------- Historical glyphs: one collection with explicit provenance ----------
+  const HISTORICAL_ORDER = ["Oracle bone", "Bronze", "Bamboo and silk", "Seal", "Clerical", "Other forms"];
+  const EDITION_NAMES = { en: "English Wiktionary", ja: "Japanese Wiktionary", zh: "Chinese Wiktionary" };
+
+  function renderHistorical(ch, combined) {
+    const root = el("div");
+    if (!combined.images.length) {
+      root.append(el("p", { class: "muted", text: "No historical-form images were found in the Wiktionary entries checked." }));
+      return root;
+    }
+    const groups = new Map();
+    for (const entry of combined.images) {
+      const name = HISTORICAL_ORDER.includes(entry.group) ? entry.group : "Other forms";
+      if (!groups.has(name)) groups.set(name, []);
+      groups.get(name).push(entry);
+    }
+    for (const label of HISTORICAL_ORDER) {
+      const group = groups.get(label);
+      if (!group?.length) continue;
+      const area = el("section", { class: "historical-group" },
+        el("h4", { text: label + " (" + group.length + ")" }));
+      const strip = el("div", { class: "forms", role: "list", "aria-label": label + " historical glyphs" });
+      for (const item of group) {
+        const file = item.identity.startsWith("File:") ? item.identity.slice(5) : null;
+        const href = file ? "https://commons.wikimedia.org/wiki/File:" + encodeURIComponent(file.replace(/ /g, "_")) : null;
+        const context = (item.context || "").trim();
+        const labelText = context && context !== label ? context.slice(0, 110) : "";
+        const outer = el("div", { class: "hg-item", role: "listitem" });
+        const link = el(href ? "a" : "div", {
+          class: "form", href, target: href ? "_blank" : null, rel: href ? "noopener" : null,
+          title: href ? "View image information and licence on Wikimedia Commons" : null,
+          "aria-label": href ? "Historical glyph of " + ch + ", " + label + "; Wikimedia Commons file" : null
+        });
+        link.append(glyphImg(item.img, "Historical glyph of " + ch + ", " + label));
+        if (labelText) link.append(el("div", { class: "period", text: labelText }));
+        outer.append(link);
+        const sources = el("div", { class: "hg-sources", "aria-label": "Wiktionary sources" });
+        for (const origin of item.sources) {
+          const sourceName = EDITION_NAMES[origin.edition] || origin.edition;
+          const location = origin.sections.join(" › ");
+          sources.append(el("a", {
+            href: wiktUrl(ch, origin.edition), target: "_blank", rel: "noopener",
+            title: sourceName + ": " + location,
+            "aria-label": sourceName + ", " + location,
+            text: origin.edition.toUpperCase()
+          }));
+        }
+        outer.append(sources);
+        strip.append(outer);
+      }
+      area.append(strip);
+      root.append(area);
+    }
+    return root;
+  }
+
+  // The page's existing lookups are promise-cached. Use all three editions,
+  // preserve partial results on failure, and calculate credits only after
+  // async image links have been inserted into the DOM.
+  function hydrateHistorical(box, ch, data, slot, creditsSlot) {
+    let generation = 0;
+    const run = async () => {
+      const id = ++generation;
+      slot.replaceChildren(el("p", { class: "muted", text: "Collecting historical glyphs from Wiktionary…" }));
+      const results = await Promise.allSettled([lookupJa(ch), lookupZh(ch)]);
+      if (id !== generation || !box.isConnected) return;
+      const histories = [data.historical || []];
+      for (const result of results) {
+        if (result.status === "fulfilled") histories.push(result.value.historical || []);
+      }
+      const merged = window.KanjiHistoricalForms.merge(histories);
+      slot.replaceChildren(renderHistorical(ch, merged));
+      creditsSlot.replaceChildren();
+      const credits = creditsFor(box);
+      if (credits) creditsSlot.append(credits);
+      if (results.some(result => result.status === "rejected")) {
+        const warning = el("p", { class: "hg-warning muted", text: "Some Wiktionary editions were unavailable; these results may be incomplete." });
+        const retry = el("button", { type: "button", text: "Retry" });
+        retry.addEventListener("click", run);
+        warning.append(retry);
+        slot.append(warning);
+      }
+    };
+    run();
+  }
+
   // ---------- Rendering ----------
   function renderEntry(ch, data, { secondary = false, note = null, kd = null } = {}) {
     const box = el("section", { class: "entry" + (secondary ? " secondary" : ""), lang: "en", "data-kanji": ch });
