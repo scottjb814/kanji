@@ -108,3 +108,10 @@ test("an unlabeled image does not inherit a different column's historical era", 
   const forms = collect(root('<h2>Chinese</h2><h3>Glyph origin</h3>' + table), "en");
   assert.deepEqual(Array.from(merge([forms]).images, item => item.group), ["Oracle bone", "Other forms"]);
 });
+
+test("preserves the exact heading anchor for deep links instead of guessing a fragment", () => {
+  const forms = collect(root('<h2 id="Chinese">Chinese</h2><div class="mw-heading mw-heading3"><h3 id="Glyph_origin_2">Glyph origin</h3></div>' + glyph()), "en");
+  const data = merge([forms]);
+  assert.equal(data.images[0].sources[0].anchor, "Glyph_origin_2");
+  assert.deepEqual(Array.from(forms[0].sectionIds), ["Chinese", "Glyph_origin_2"]);
+});
