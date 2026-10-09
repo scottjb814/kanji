@@ -124,6 +124,22 @@ footer { max-width: 720px; margin: 0 auto; padding: 0 14px 40px; font-size: 12.5
 .prose [lang^=zh], .prose [lang^=ja], .prose .Hani, .prose .Jpan, details [lang] { font-style: normal; }
 a.k { text-decoration-style: dotted; text-decoration-color: var(--seal); }
 
+
+/* Consolidated, source-aware historical glyph gallery */
+.historical { margin: 18px 0 22px; }
+.historical > h3 { font: 600 17px/1.3 var(--ui); margin: 0 0 4px; }
+.historical .historical-intro { font-size: 13px; color: var(--muted); margin: 0 0 12px; }
+.historical .historical-group { margin: 14px 0 0; }
+.historical .historical-group h4 { font: 600 13px/1.4 var(--ui); color: var(--muted); margin: 0 0 7px; }
+.historical .hg-item { flex: none; width: 112px; scroll-snap-align: start; }
+.historical .hg-item .form { width: 100%; min-height: 122px; }
+.historical .hg-item .period { overflow-wrap: anywhere; }
+.historical .hg-sources { font: 12px/1.4 var(--ui); margin-top: 5px; display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
+.historical .hg-sources a { border: 1px solid var(--line); border-radius: 5px; padding: 2px 5px; text-decoration: none; }
+.historical .hg-sources a:hover { border-color: var(--seal); }
+.historical .hg-warning { margin: 9px 0; font-size: 13px; }
+.historical .hg-warning button { min-height: 32px; padding: 0 10px; margin-left: 8px; font-size: 12px; }
+
 /* Historical forms strip */
 .forms {
   display: flex; gap: 8px; overflow-x: auto;
@@ -517,8 +533,8 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
     return u;
   }
 
-  function glyphImg(src) {
-    const img = el("img", { src: imgUrl(src), alt: "", loading: "lazy", decoding: "async", referrerpolicy: "strict-origin-when-cross-origin" });
+  function glyphImg(src, alt = "") {
+    const img = el("img", { src: imgUrl(src), alt, loading: "lazy", decoding: "async", referrerpolicy: "strict-origin-when-cross-origin" });
     img.addEventListener("error", () => {
       if (!img.dataset.retried) {
         img.dataset.retried = "1";
@@ -990,7 +1006,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
   const GENERIC_ARTIST = /file history|see user|contributor names|digital file creation/i;
   const normTitle = t => t.replace(/_/g, " ");
   function creditsFor(box) {
-    const links = [...box.querySelectorAll(".forms a.form[href*='/wiki/File:'], .rawtable a[href*='/wiki/File:']")];
+    const links = [...box.querySelectorAll(".historical .forms a.form[href*='/wiki/File:']")];
     const titles = [...new Set(links.map(a => {
       try { return normTitle(decodeURIComponent(new URL(a.href).pathname.replace(/^\/wiki\//, ""))); } catch { return null; }
     }).filter(Boolean))];
@@ -1293,6 +1309,99 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
   }
   if (KP_INLINE) $("#kpfoot").hidden = false;
 
+  // ---------- Historical glyphs: one collection with explicit provenance ----------
+  const HISTORICAL_ORDER = ["Oracle bone", "Bronze", "Bamboo and silk", "Seal", "Clerical", "Other forms"];
+  const EDITION_NAMES = { en: "English Wiktionary", ja: "Japanese Wiktionary", zh: "Chinese Wiktionary" };
+
+  function renderHistorical(ch, combined) {
+    const root = el("div");
+    if (!combined.images.length) {
+      root.append(el("p", { class: "muted", text: "No historical-form images were found in the Wiktionary entries checked." }));
+      return root;
+    }
+    const groups = new Map();
+    for (const entry of combined.images) {
+      const name = HISTORICAL_ORDER.includes(entry.group) ? entry.group : "Other forms";
+      if (!groups.has(name)) groups.set(name, []);
+      groups.get(name).push(entry);
+    }
+    for (const label of HISTORICAL_ORDER) {
+      const group = groups.get(label);
+      if (!group?.length) continue;
+      const area = el("section", { class: "historical-group" },
+        el("h4", { text: label + " (" + group.length + ")" }));
+      const strip = el("div", { class: "forms", role: "list", "aria-label": label + " historical glyphs" });
+      for (const item of group) {
+        const file = item.identity.startsWith("File:") ? item.identity.slice(5) : null;
+        const href = file ? "https://commons.wikimedia.org/wiki/File:" + encodeURIComponent(file.replace(/ /g, "_")) : null;
+        const context = (item.context || "").trim();
+        const labelText = context && context !== label ? context.slice(0, 110) : "";
+        const outer = el("div", { class: "hg-item", role: "listitem" });
+        const link = el(href ? "a" : "div", {
+          class: "form", href, target: href ? "_blank" : null, rel: href ? "noopener" : null,
+          title: href ? "View image information and licence on Wikimedia Commons" : null,
+          "aria-label": href ? "Historical glyph of " + ch + ", " + label + "; Wikimedia Commons file" : null
+        });
+        link.append(glyphImg(item.img, "Historical glyph of " + ch + ", " + label));
+        if (labelText) link.append(el("div", { class: "period", text: labelText }));
+        outer.append(link);
+        const sources = el("div", { class: "hg-sources", "aria-label": "Wiktionary sources" });
+        const editions = new Map();
+        for (const origin of item.sources) {
+          if (!editions.has(origin.edition)) editions.set(origin.edition, []);
+          editions.get(origin.edition).push(origin);
+        }
+        for (const [edition, locations] of editions) {
+          const sourceName = EDITION_NAMES[edition] || edition;
+          const fullPaths = [...new Set(locations.map(o => o.sections.join(" › ")))].join("; ");
+          const anchored = locations.find(o => o.anchor) || locations[0];
+          const url = wiktUrl(ch, edition) + (anchored.anchor ? "#" + encodeURIComponent(anchored.anchor) : "");
+          sources.append(el("a", {
+            href: url, target: "_blank", rel: "noopener",
+            title: sourceName + ": " + fullPaths,
+            "aria-label": sourceName + ", " + fullPaths,
+            text: edition.toUpperCase() + (locations.length > 1 ? " (" + locations.length + ")" : "")
+          }));
+        }
+        outer.append(sources);
+        strip.append(outer);
+      }
+      area.append(strip);
+      root.append(area);
+    }
+    return root;
+  }
+
+  // The page's existing lookups are promise-cached. Use all three editions,
+  // preserve partial results on failure, and calculate credits only after
+  // async image links have been inserted into the DOM.
+  function hydrateHistorical(box, ch, data, slot, creditsSlot) {
+    let generation = 0;
+    const run = async () => {
+      const id = ++generation;
+      slot.replaceChildren(el("p", { class: "muted", text: "Collecting historical glyphs from Wiktionary…" }));
+      const results = await Promise.allSettled([lookupJa(ch), lookupZh(ch)]);
+      if (id !== generation || !box.isConnected) return;
+      const histories = [data.historical || []];
+      for (const result of results) {
+        if (result.status === "fulfilled") histories.push(result.value.historical || []);
+      }
+      const merged = window.KanjiHistoricalForms.merge(histories);
+      slot.replaceChildren(renderHistorical(ch, merged));
+      creditsSlot.replaceChildren();
+      const credits = creditsFor(box);
+      if (credits) creditsSlot.append(credits);
+      if (results.some(result => result.status === "rejected")) {
+        const warning = el("p", { class: "hg-warning muted", text: "Some Wiktionary editions were unavailable; these results may be incomplete." });
+        const retry = el("button", { type: "button", text: "Retry" });
+        retry.addEventListener("click", run);
+        warning.append(retry);
+        slot.append(warning);
+      }
+    };
+    run();
+  }
+
   // ---------- Rendering ----------
   function renderEntry(ch, data, { secondary = false, note = null, kd = null } = {}) {
     const box = el("section", { class: "entry" + (secondary ? " secondary" : ""), lang: "en", "data-kanji": ch });
@@ -1308,11 +1417,18 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
     if (kd) kdSlot.append(renderKD(kd));
     box.append(kdSlot);
     if (note) box.append(note);
+    const historical = el("section", { class: "historical" },
+      el("h3", { text: "Historical forms" }),
+      el("p", { class: "historical-intro", text: "Images from Wikimedia Commons. EN, JA and ZH link to the Wiktionary pages where each image appears." }));
+    const historicalBody = el("div");
+    historical.append(historicalBody);
+    box.append(historical);
+    const creditsSlot = el("div", { class: "historical-credits" });
     const finish = () => {
       if (BRUSH_INLINE) box.append(brushFor(ch));
-      const cr = creditsFor(box);
-      if (cr) box.append(cr);
+      box.append(creditsSlot);
       box.append(extrasFor(ch, data.kyujitai));
+      hydrateHistorical(box, ch, data, historicalBody, creditsSlot);
       return box;
     };
 
@@ -1326,19 +1442,20 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
         : `No glyph-origin section for ${ch} on English Wiktionary. Open the full entry with the link above.` }));
       return finish();
     }
-    const anyTable = data.blocks.some(b => b.forms);
-    if (!anyTable && !data.kyujitai) box.append(el("p", { class: "muted", text: "Wiktionary has no historical-forms table for this character." }));
-
     for (const b of data.blocks) {
       const label = (b.total > 1 ? `${b.lang}, ${b.heading} (${b.n} of ${b.total})` : `${b.lang}, ${b.heading}`) + " · English Wiktionary";
       const blk = el("div", { class: "block" }, el("h3", {}, el("span", { class: "chip", text: "Crowd-sourced" }), label));
-      if (b.forms) blk.append(renderForms(b.forms));
+      // Keep complete Wiktionary tables (including textual forms and image
+      // source notes) accessible without duplicating the visible glyph strip.
+      if (b.forms) {
+        blk.append(el("details", {},
+          el("summary", { text: "Original historical-form table and source notes" }),
+          el("div", {}, renderForms(b.forms))));
+      }
       if (b.prose.length) {
         const pr = el("div", { class: "prose" });
         b.prose.forEach(p => pr.append(clean(p)));
         blk.append(pr);
-      } else if (!b.forms) {
-        blk.append(el("p", { class: "muted", text: "No explanation in this section." }));
       }
       if (b.phonetic) {
         const headTxt = (b.phonetic.querySelector(".NavHead") || {}).textContent || "Characters in the same phonetic series";
@@ -1351,7 +1468,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
         const r = el("div", { class: "refs" }, "References", clean(b.refs));
         blk.append(r);
       }
-      box.append(blk);
+      if (b.forms || b.prose.length || b.phonetic || b.refs) box.append(blk);
     }
     return finish();
   }

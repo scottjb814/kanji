@@ -24,7 +24,7 @@ GitHub Actions deploys from main and refreshes KANJIDIC2 monthly. Feature branch
 
 Some dictionary HTML extractors depend on upstream markup. A successful deployment alone does not guarantee that all lookups continue to parse correctly.
 
-## Experimental historical-form discovery
+## Consolidated cross-edition historical forms
 
 `historical-forms.js` collects historical glyph tables independently of the
 particular Wiktionary heading or edition where they appear. It records the
@@ -33,14 +33,30 @@ Wikimedia Commons identity of each image. Its `merge()` helper deduplicates
 images by file identity while retaining every source attribution and never
 merges distinct image files just because they share a script label.
 
-**This is an extraction-only experiment.** The existing glyph gallery and
-etymology cards still render as before. A later UI phase can use the collected
-records to produce a consolidated gallery, with per-image attribution.
+**The consolidated gallery is now rendered.** Historical images from the
+English, Japanese and Chinese entries are merged by Wikimedia Commons file
+identity, grouped only when the table's own column labels establish the
+script, and displayed near the top of each entry. If the script is uncertain,
+the image stays under "Other forms" rather than receiving an inferred date.
+Each glyph links to its Commons file information and licence; edition chips
+(EN, JA, ZH) link to the originating Wiktionary page and, where available,
+the exact source heading. Multiple citations in the same edition are
+combined into one labeled chip while retaining their headings in its title.
+
+The prose and cited etymologies remain below the consolidated gallery.
+Original Wiktionary forms tables, including text-only variants and source
+notes, remain accessible in collapsed detail sections. Wikimedia credits are
+calculated after images arrive and cover the unique visible Commons files.
+
+Japanese and Chinese lookups are asynchronous and independently cached.
+If one edition fails, the gallery retains the results from available
+editions and offers a retry action. No new runtime dependencies, Worker
+changes, or hosting changes are required.
 
 The production page uses no extra runtime dependencies. PR checks install a
 small **test-only** HTML DOM parser to exercise synthetic page fixtures:
 
-    node --test tests/historical.spec.mjs
+    node --test tests/historical.spec.mjs tests/gallery.spec.mjs
 
 A manual network-dependent check (not in routine CI) is available:
 
@@ -49,3 +65,21 @@ A manual network-dependent check (not in routine CI) is available:
 The probe fetches English, Japanese and Chinese Wiktionary API responses for
 討, 牛 and 字; it prints only image counts and section headings, not copied
 dictionary explanations. These checks can become stale as Wiktionary changes.
+
+### One-off visual check
+
+The optional browser smoke test uses **synthetic** English, Japanese and
+Chinese Wiktionary API responses, so it does not redistribute dictionary
+explanations. To run it locally, install a test-only Playwright package and
+Chromium, then run:
+
+    npm install --no-save --no-package-lock playwright@1.55.1
+    npx playwright install chromium
+    node tests/visual-smoke.mjs
+
+The test serves the site locally at port 8765, uses a 390 px Chromium viewport,
+and verifies distinct images, source links, grouped scripts, Commons credits,
+and collapsed original tables. It saves a screenshot under
+\`test-output/historical-gallery.png\`. Neither Playwright nor the HTML DOM
+test dependency is required by the deployed website. The smoke test is not in
+regular CI because browser setup is disproportionately costly.

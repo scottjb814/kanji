@@ -86,3 +86,32 @@ test("handles empty tables and invalid image URLs gracefully", () => {
     '<table class="zh-glyph"><tr><td><img src="javascript:alert(1)"></td></tr></table>');
   assert.equal(collect(d, "en").length, 0);
 });
+
+test("different images in the same table inherit their own column labels", () => {
+  const table = '<table class="zh-glyph">' +
+    '<tr><th colspan="2">Historical forms</th></tr>' +
+    '<tr><th>Oracle bone script</th><th>Bronze inscriptions</th></tr>' +
+    '<tr><td>' + file("Oracle.svg") + '</td><td>' + file("Bronze.svg") + '</td></tr></table>';
+  const forms = collect(root('<h2>Chinese</h2><h3>Glyph origin</h3>' + table), "en");
+  assert.equal(forms.length, 1);
+  const merged = merge([forms]);
+  assert.deepEqual(Array.from(merged.images, item => item.group), ["Oracle bone", "Bronze"]);
+  assert.match(merged.images[0].context, /Oracle bone/);
+  assert.match(merged.images[1].context, /Bronze/);
+});
+
+test("an unlabeled image does not inherit a different column's historical era", () => {
+  const table = '<table class="zh-glyph">' +
+    '<tr><th colspan="2">Historical forms</th></tr>' +
+    '<tr><th>Oracle bone script</th><th>Unknown</th></tr>' +
+    '<tr><td>' + file("Oracle.svg") + '</td><td>' + file("Unknown.svg") + '</td></tr></table>';
+  const forms = collect(root('<h2>Chinese</h2><h3>Glyph origin</h3>' + table), "en");
+  assert.deepEqual(Array.from(merge([forms]).images, item => item.group), ["Oracle bone", "Other forms"]);
+});
+
+test("preserves the exact heading anchor for deep links instead of guessing a fragment", () => {
+  const forms = collect(root('<h2 id="Chinese">Chinese</h2><div class="mw-heading mw-heading3"><h3 id="Glyph_origin_2">Glyph origin</h3></div>' + glyph()), "en");
+  const data = merge([forms]);
+  assert.equal(data.images[0].sources[0].anchor, "Glyph_origin_2");
+  assert.deepEqual(Array.from(forms[0].sectionIds), ["Chinese", "Glyph_origin_2"]);
+});
