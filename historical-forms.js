@@ -1,0 +1,113 @@
+/*
+ * Historical-form discovery for Wiktionary HTML.
+ * Plain browser script, intentionally independent of presentation and network
+ * access; consumed by index.html and by Node regression tests.
+ *
+ * Each record retains a source, heading path, original table node, and file
+ * identities.  Cross-edition deduplication is performed at *image* level,
+ * never by assuming two different inscriptions are the same just because
+ * they share the same script label.
+ */
+((scope) => {
+  "use strict";
+  const SCRIPT_LABEL = /oracle.bone|bronze inscription|seal script|ancient script|slip (?:and silk )?script|甲骨|金文|銅器|小篆|篆文|篆書|古文|楚簡|秦簡|隸書|隶书|六書通/i;
+  const HISTORICAL_CAPTION = /historical forms|歷代字形|历代字形|字形演變|字形演变|古文字形/i;
+  const ORIGIN_SECTION = /glyph origin|字源|字形|字形演變|字形演变|字形の変遷/i;
+  const NON_HISTORICAL = /stroke order|筆順|笔顺|筆画順|書き順/i;
+
+  function headingOf(node) {
+    if (/^H[2-6]$/.test(node.tagName)) return node;
+    if (node.classList?.contains("mw-heading"))
+      return node.querySelector("h2,h3,h4,h5,h6");
+    return null;
+  }
+
+  function imageIdentity(img) {
+    const anchor = img.closest("a[href]");
+    if (anchor) {
+      const href = anchor.getAttribute("href") || "";
+      const m = href.match(/(?:\/wiki\/|\/wiki\/Special:FilePath\/)(?:File:|%46ile%3A|文件:|檔案:)([^#?]+)/i);
+      if (m) {
+        try { return "File:" + decodeURIComponent(m[1]).replace(/_/g, " ").normalize("NFC"); }
+        catch { return "File:" + m[1].replace(/_/g, " ").normalize("NFC"); }
+      }
+    }
+    const src = img.getAttribute("src") || img.getAttribute("data-src") || "";
+    if (!src) return null;
+    try {
+      const url = new URL(src.startsWith("//") ? "https:" + src : src, "https://upload.wikimedia.org");
+      if (url.hostname === "upload.wikimedia.org") {
+        const bits = url.pathname.split("/");
+        if (bits[1] === "wikipedia" && bits[2] === "commons") {
+          const file = bits[3] === "thumb" ? bits[6] : bits[5];
+          if (file) return "File:" + decodeURIComponent(file).replace(/_/g, " ").normalize("NFC");
+        }
+      }
+      // Non-Commons images still have a stable identity if URLs agree.
+      if (url.protocol === "https:") return "URL:" + url.href;
+    } catch { /* Ignore incomplete/malformed image addresses. */ }
+    return null;
+  }
+
+  function isHistoricalTable(table, path) {
+    if (NON_HISTORICAL.test(path.join(" > "))) return false;
+    if (table.matches("table.zh-glyph,table#jigen,#jigen table")) return true;
+    const heading = path.join(" > ");
+    const upper = table.querySelector("caption,th");
+    const caption = upper?.textContent?.trim() || "";
+    const text = table.textContent || "";
+    if (HISTORICAL_CAPTION.test(caption)) return true;
+    if (!ORIGIN_SECTION.test(heading)) return false;
+    return !!table.querySelector("img") && SCRIPT_LABEL.test(text);
+  }
+
+  function collect(root, edition = "en") {
+    if (!root) return [];
+    const output = [], stack = [];
+    const visited = new Set();
+    for (let node = root.firstElementChild; node; node = node.nextElementSibling) {
+      const heading = headingOf(node);
+      if (heading) {
+        const level = Number(heading.tagName.slice(1));
+        while (stack.length && stack.at(-1).level >= level) stack.pop();
+        stack.push({ level, text: heading.textContent.trim().replace(/\s+/g, " ") });
+        continue;
+      }
+      const path = stack.map(s => s.text);
+      const tables = node.matches("table") ? [node, ...node.querySelectorAll("table")] : [...node.querySelectorAll("table")];
+      for (const table of tables) {
+        if (visited.has(table) || !isHistoricalTable(table, path)) continue;
+        visited.add(table);
+        const images = [...table.querySelectorAll("img")]
+          .map(img => ({ identity: imageIdentity(img), img }))
+          .filter(item => item.identity);
+        // Empty tables aren't evidence of glyph images. Historical text-only
+        // cells remain eligible for the old renderer, but not image dedup.
+        if (!images.length && !table.textContent.trim()) continue;
+        output.push({ edition, sections: [...path], table, images });
+      }
+    }
+    return output;
+  }
+
+  function merge(collections) {
+    const byIdentity = new Map(), records = [];
+    for (const record of collections.flat()) {
+      records.push(record);
+      for (const item of record.images) {
+        let found = byIdentity.get(item.identity);
+        if (!found) {
+          found = { identity: item.identity, img: item.img, sources: [] };
+          byIdentity.set(item.identity, found);
+        }
+        const source = { edition: record.edition, sections: [...record.sections] };
+        if (!found.sources.some(s => s.edition === source.edition && s.sections.join("\u001f") === source.sections.join("\u001f"))) {
+          found.sources.push(source);
+        }
+      }
+    }
+    return { records, images: [...byIdentity.values()] };
+  }
+
+  scope.KanjiHistoricalForms = Object.freeze({ collect, merge, imageIdentity, headingOf });
+})(globalThis);

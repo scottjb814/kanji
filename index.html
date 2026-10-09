@@ -248,6 +248,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
   <span id="moefoot" hidden>字樣說明 text: 教育部《<a href="https://dict.variants.moe.edu.tw/" target="_blank" rel="noopener">異體字字典</a>》, Ministry of Education, Taiwan.</span>
 </footer>
 
+<script src="historical-forms.js"></script>
 <script>
 (() => {
   "use strict";
@@ -337,6 +338,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
   function extract(html, ch) {
     const doc = new DOMParser().parseFromString(html, "text/html");
     const root = doc.querySelector(".mw-parser-output") || doc.body;
+    const historical = window.KanjiHistoricalForms.collect(root, "en");
     const blocks = [];
     const langText = {};
     let lang = null, langCount = {};
@@ -384,7 +386,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
     const m = ja.match(/kanji, ky[uū]jitai form\s*(\p{Script=Han})/u);
     if (m && m[1].normalize("NFC") !== ch.normalize("NFC")) kyujitai = m[1];
 
-    return { blocks, kyujitai };
+    return { blocks, kyujitai, historical };
   }
 
   // ---------- Japanese Wiktionary: 字源 ----------
@@ -405,6 +407,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
   function extractJa(html) {
     const doc = new DOMParser().parseFromString(html, "text/html");
     const root = doc.querySelector(".mw-parser-output") || doc.body;
+    const historical = window.KanjiHistoricalForms.collect(root, "ja");
     const blocks = [];
     let node = root.firstElementChild;
     while (node) {
@@ -425,7 +428,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
       node = node.nextElementSibling;
     }
     blocks.forEach((b, i) => { b.n = i + 1; b.total = blocks.length; });
-    return { blocks };
+    return { blocks, historical };
   }
 
   // ---------- 說文解字 on Chinese Wikisource ----------
@@ -783,6 +786,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
   function extractZh(html) {
     const doc = new DOMParser().parseFromString(html, "text/html");
     const root = doc.querySelector(".mw-parser-output") || doc.body;
+    const historical = window.KanjiHistoricalForms.collect(root, "zh");
     const blocks = [];
     let sections = 0;
     let node = root.firstElementChild;
@@ -808,7 +812,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
       node = node.nextElementSibling;
     }
     blocks.forEach((b, i) => { b.n = i + 1; b.total = blocks.length; });
-    return { blocks, sections };
+    return { blocks, sections, historical };
   }
   function renderZh(d, ch) {
     if (d.missing || !d.blocks.length) {
