@@ -24,7 +24,7 @@ GitHub Actions deploys from main and refreshes KANJIDIC2 monthly. Feature branch
 
 Some dictionary HTML extractors depend on upstream markup. A successful deployment alone does not guarantee that all lookups continue to parse correctly.
 
-## Experimental historical-form discovery
+## Consolidated cross-edition historical forms
 
 `historical-forms.js` collects historical glyph tables independently of the
 particular Wiktionary heading or edition where they appear. It records the
@@ -65,3 +65,21 @@ A manual network-dependent check (not in routine CI) is available:
 The probe fetches English, Japanese and Chinese Wiktionary API responses for
 討, 牛 and 字; it prints only image counts and section headings, not copied
 dictionary explanations. These checks can become stale as Wiktionary changes.
+
+### One-off visual check
+
+The optional browser smoke test uses **synthetic** English, Japanese and
+Chinese Wiktionary API responses, so it does not redistribute dictionary
+explanations. To run it locally, install a test-only Playwright package and
+Chromium, then run:
+
+    npm install --no-save --no-package-lock playwright@1.55.1
+    npx playwright install chromium
+    node tests/visual-smoke.mjs
+
+The test serves the site locally at port 8765, uses a 390 px Chromium viewport,
+and verifies distinct images, source links, grouped scripts, Commons credits,
+and collapsed original tables. It saves a screenshot under
+\`test-output/historical-gallery.png\`. Neither Playwright nor the HTML DOM
+test dependency is required by the deployed website. The smoke test is not in
+regular CI because browser setup is disproportionately costly.
