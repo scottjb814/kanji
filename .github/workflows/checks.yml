@@ -33,3 +33,17 @@ jobs:
         run: npm install --no-save --no-package-lock --ignore-scripts linkedom@0.18.12
       - name: Test Wiktionary section discovery and image identity
         run: node --test tests/historical.spec.mjs tests/gallery.spec.mjs
+
+      - name: Install Chromium for one-off visual smoke test
+        run: |
+          npm install --no-save --no-package-lock --ignore-scripts playwright@1.55.1
+          npx playwright install --with-deps chromium
+      - name: Preview consolidated gallery in mobile Chromium
+        run: node tests/visual-smoke.mjs
+      - name: Upload visual proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: historical-gallery-mobile
+          path: test-output/historical-gallery.png
+          if-no-files-found: ignore
