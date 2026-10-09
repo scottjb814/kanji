@@ -110,7 +110,7 @@
       if (heading) {
         const level = Number(heading.tagName.slice(1));
         while (stack.length && stack.at(-1).level >= level) stack.pop();
-        stack.push({ level, text: heading.textContent.trim().replace(/\s+/g, " ") });
+        stack.push({ level, text: heading.textContent.trim().replace(/\s+/g, " "), anchor: heading.id || null });
         continue;
       }
       const path = stack.map(s => s.text);
@@ -124,7 +124,7 @@
         // Empty tables aren't evidence of glyph images. Historical text-only
         // cells remain eligible for the old renderer, but not image dedup.
         if (!images.length && !table.textContent.trim()) continue;
-        output.push({ edition, sections: [...path], table, images });
+        output.push({ edition, sections: [...path], sectionIds: stack.map(s => s.anchor), table, images });
       }
     }
     return output;
@@ -144,7 +144,8 @@
           found.context = item.context;
           found.group = scriptGroup(item.context);
         }
-        const source = { edition: record.edition, sections: [...record.sections] };
+        const lastAnchor = (record.sectionIds || []).filter(Boolean).at(-1) || null;
+        const source = { edition: record.edition, sections: [...record.sections], anchor: lastAnchor };
         if (!found.sources.some(s => s.edition === source.edition && s.sections.join("\u001f") === source.sections.join("\u001f"))) {
           found.sources.push(source);
         }
