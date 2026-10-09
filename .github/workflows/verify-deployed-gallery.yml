@@ -1,0 +1,37 @@
+name: One-off deployed gallery verification
+on:
+  push:
+    branches:
+      - diagnostics/pages-gallery-verify-2026-10-08
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Verify published GitHub Pages assets
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          const origin = "https://scottjb814.github.io/kanji/";
+          async function load(path) {
+            const url = origin + path;
+            const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+            assert.equal(r.status, 200, "GET " + url + " returned " + r.status);
+            const body = await r.text();
+            console.log("PASS " + path + ": HTTP " + r.status + ", bytes=" + Buffer.byteLength(body));
+            return body;
+          }
+          const html = await load("");
+          assert.match(html, /<script src="historical-forms\.js"><\/script>/, "production HTML includes the extractor");
+          assert.match(html, /function renderHistorical\(ch, combined\)/, "production HTML includes consolidated gallery renderer");
+          assert.match(html, /hydrateHistorical\(box, ch, data, historicalBody, creditsSlot\)/, "production HTML hydrates entries");
+          assert.match(html, /const HISTORICAL_ORDER = /, "production gallery has script groups");
+          const js = await load("historical-forms.js");
+          assert.match(js, /function imageContext\(img, table\)/, "published extractor labels glyphs");
+          assert.match(js, /function merge\(collections\)/, "published extractor deduplicates images");
+          assert.match(js, /scope\.KanjiHistoricalForms/, "published extractor exports browser API");
+          await load("data/shuowen_index.json");
+          console.log("PASS: production gallery HTML, separate JS module, and classical index published together.");
+          NODE
