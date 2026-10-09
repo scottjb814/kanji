@@ -1410,11 +1410,18 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
     if (kd) kdSlot.append(renderKD(kd));
     box.append(kdSlot);
     if (note) box.append(note);
+    const historical = el("section", { class: "historical" },
+      el("h3", { text: "Historical forms" }),
+      el("p", { class: "historical-intro", text: "Images from Wikimedia Commons. EN, JA and ZH link to the Wiktionary pages where each image appears." }));
+    const historicalBody = el("div");
+    historical.append(historicalBody);
+    box.append(historical);
+    const creditsSlot = el("div", { class: "historical-credits" });
     const finish = () => {
       if (BRUSH_INLINE) box.append(brushFor(ch));
-      const cr = creditsFor(box);
-      if (cr) box.append(cr);
+      box.append(creditsSlot);
       box.append(extrasFor(ch, data.kyujitai));
+      hydrateHistorical(box, ch, data, historicalBody, creditsSlot);
       return box;
     };
 
@@ -1428,19 +1435,14 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
         : `No glyph-origin section for ${ch} on English Wiktionary. Open the full entry with the link above.` }));
       return finish();
     }
-    const anyTable = data.blocks.some(b => b.forms);
-    if (!anyTable && !data.kyujitai) box.append(el("p", { class: "muted", text: "Wiktionary has no historical-forms table for this character." }));
-
     for (const b of data.blocks) {
       const label = (b.total > 1 ? `${b.lang}, ${b.heading} (${b.n} of ${b.total})` : `${b.lang}, ${b.heading}`) + " · English Wiktionary";
       const blk = el("div", { class: "block" }, el("h3", {}, el("span", { class: "chip", text: "Crowd-sourced" }), label));
-      if (b.forms) blk.append(renderForms(b.forms));
+      // The consolidated gallery displays glyph images; keep explanations here.
       if (b.prose.length) {
         const pr = el("div", { class: "prose" });
         b.prose.forEach(p => pr.append(clean(p)));
         blk.append(pr);
-      } else if (!b.forms) {
-        blk.append(el("p", { class: "muted", text: "No explanation in this section." }));
       }
       if (b.phonetic) {
         const headTxt = (b.phonetic.querySelector(".NavHead") || {}).textContent || "Characters in the same phonetic series";
@@ -1453,7 +1455,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
         const r = el("div", { class: "refs" }, "References", clean(b.refs));
         blk.append(r);
       }
-      box.append(blk);
+      if (b.prose.length || b.phonetic || b.refs) box.append(blk);
     }
     return finish();
   }
