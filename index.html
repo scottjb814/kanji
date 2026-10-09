@@ -1006,7 +1006,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
   const GENERIC_ARTIST = /file history|see user|contributor names|digital file creation/i;
   const normTitle = t => t.replace(/_/g, " ");
   function creditsFor(box) {
-    const links = [...box.querySelectorAll(".forms a.form[href*='/wiki/File:'], .rawtable a[href*='/wiki/File:']")];
+    const links = [...box.querySelectorAll(".historical .forms a.form[href*='/wiki/File:']")];
     const titles = [...new Set(links.map(a => {
       try { return normTitle(decodeURIComponent(new URL(a.href).pathname.replace(/^\/wiki\//, ""))); } catch { return null; }
     }).filter(Boolean))];
@@ -1438,7 +1438,13 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
     for (const b of data.blocks) {
       const label = (b.total > 1 ? `${b.lang}, ${b.heading} (${b.n} of ${b.total})` : `${b.lang}, ${b.heading}`) + " · English Wiktionary";
       const blk = el("div", { class: "block" }, el("h3", {}, el("span", { class: "chip", text: "Crowd-sourced" }), label));
-      // The consolidated gallery displays glyph images; keep explanations here.
+      // Keep complete Wiktionary tables (including textual forms and image
+      // source notes) accessible without duplicating the visible glyph strip.
+      if (b.forms) {
+        blk.append(el("details", {},
+          el("summary", { text: "Original historical-form table and source notes" }),
+          el("div", {}, renderForms(b.forms))));
+      }
       if (b.prose.length) {
         const pr = el("div", { class: "prose" });
         b.prose.forEach(p => pr.append(clean(p)));
@@ -1455,7 +1461,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
         const r = el("div", { class: "refs" }, "References", clean(b.refs));
         blk.append(r);
       }
-      if (b.prose.length || b.phonetic || b.refs) box.append(blk);
+      if (b.forms || b.prose.length || b.phonetic || b.refs) box.append(blk);
     }
     return finish();
   }
