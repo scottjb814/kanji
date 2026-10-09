@@ -1346,14 +1346,21 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
         if (labelText) link.append(el("div", { class: "period", text: labelText }));
         outer.append(link);
         const sources = el("div", { class: "hg-sources", "aria-label": "Wiktionary sources" });
+        const editions = new Map();
         for (const origin of item.sources) {
-          const sourceName = EDITION_NAMES[origin.edition] || origin.edition;
-          const location = origin.sections.join(" › ");
+          if (!editions.has(origin.edition)) editions.set(origin.edition, []);
+          editions.get(origin.edition).push(origin);
+        }
+        for (const [edition, locations] of editions) {
+          const sourceName = EDITION_NAMES[edition] || edition;
+          const fullPaths = [...new Set(locations.map(o => o.sections.join(" › ")))].join("; ");
+          const anchored = locations.find(o => o.anchor) || locations[0];
+          const url = wiktUrl(ch, edition) + (anchored.anchor ? "#" + encodeURIComponent(anchored.anchor) : "");
           sources.append(el("a", {
-            href: wiktUrl(ch, origin.edition), target: "_blank", rel: "noopener",
-            title: sourceName + ": " + location,
-            "aria-label": sourceName + ", " + location,
-            text: origin.edition.toUpperCase()
+            href: url, target: "_blank", rel: "noopener",
+            title: sourceName + ": " + fullPaths,
+            "aria-label": sourceName + ", " + fullPaths,
+            text: edition.toUpperCase() + (locations.length > 1 ? " (" + locations.length + ")" : "")
           }));
         }
         outer.append(sources);
