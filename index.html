@@ -124,6 +124,22 @@ footer { max-width: 720px; margin: 0 auto; padding: 0 14px 40px; font-size: 12.5
 .prose [lang^=zh], .prose [lang^=ja], .prose .Hani, .prose .Jpan, details [lang] { font-style: normal; }
 a.k { text-decoration-style: dotted; text-decoration-color: var(--seal); }
 
+
+/* Consolidated, source-aware historical glyph gallery */
+.historical { margin: 18px 0 22px; }
+.historical > h3 { font: 600 17px/1.3 var(--ui); margin: 0 0 4px; }
+.historical .historical-intro { font-size: 13px; color: var(--muted); margin: 0 0 12px; }
+.historical .historical-group { margin: 14px 0 0; }
+.historical .historical-group h4 { font: 600 13px/1.4 var(--ui); color: var(--muted); margin: 0 0 7px; }
+.historical .hg-item { flex: none; width: 112px; scroll-snap-align: start; }
+.historical .hg-item .form { width: 100%; min-height: 122px; }
+.historical .hg-item .period { overflow-wrap: anywhere; }
+.historical .hg-sources { font: 12px/1.4 var(--ui); margin-top: 5px; display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
+.historical .hg-sources a { border: 1px solid var(--line); border-radius: 5px; padding: 2px 5px; text-decoration: none; }
+.historical .hg-sources a:hover { border-color: var(--seal); }
+.historical .hg-warning { margin: 9px 0; font-size: 13px; }
+.historical .hg-warning button { min-height: 32px; padding: 0 10px; margin-left: 8px; font-size: 12px; }
+
 /* Historical forms strip */
 .forms {
   display: flex; gap: 8px; overflow-x: auto;
@@ -517,8 +533,8 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
     return u;
   }
 
-  function glyphImg(src) {
-    const img = el("img", { src: imgUrl(src), alt: "", loading: "lazy", decoding: "async", referrerpolicy: "strict-origin-when-cross-origin" });
+  function glyphImg(src, alt = "") {
+    const img = el("img", { src: imgUrl(src), alt, loading: "lazy", decoding: "async", referrerpolicy: "strict-origin-when-cross-origin" });
     img.addEventListener("error", () => {
       if (!img.dataset.retried) {
         img.dataset.retried = "1";
