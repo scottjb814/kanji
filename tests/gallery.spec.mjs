@@ -118,3 +118,41 @@ test("failed edition shows partial English results and a retry action",async () 
   assert.match(slot.textContent,/results may be incomplete/);
   assert.equal(slot.querySelectorAll("button").length,1);
 });
+
+test("renderEntry positions one gallery before explanations and collapses the original table", async () => {
+  const f = fixture();
+  const fragment = script.slice(script.indexOf("  function renderEntry("), script.indexOf("  async function show("));
+  f.ctx.BRUSH_INLINE = false;
+  f.ctx.saveButton = () => f.node("button", { text: "Save" });
+  f.ctx.sourceLinks = () => f.node("nav");
+  f.ctx.cpOf = () => "U+725B";
+  f.ctx.extrasFor = () => f.node("section", { class: "extras" });
+  f.ctx.renderForms = () => f.node("div", { class: "original-table-placeholder", text: "complete original table" });
+  f.ctx.clean = e => e.cloneNode(true);
+  vm.runInContext(fragment, f.ctx);
+  const im = image(f, "Bronze.svg", "Bronze", "Bronze inscriptions", [
+    sourceInfo("en", ["Chinese", "Glyph origin"])
+  ]);
+  const original = f.node("table");
+  original.append(f.node("tr", {}, f.node("td", {}, f.node("img", { src: "original.png" }))));
+  const data = {
+    missing: false, kyujitai: null,
+    blocks: [{ lang: "Chinese", heading: "Glyph origin", total: 1,
+      forms: original, prose: [f.node("p", {text:"Source explanation"})],
+      refs: null, phonetic: null }],
+    historical: [{ images: [im] }]
+  };
+  const entry = f.ctx.renderEntry("牛", data);
+  f.document.querySelector("main").append(entry);
+  await new Promise(resolve => setImmediate(resolve));
+  const gallery = entry.querySelector(".historical");
+  assert.ok(gallery);
+  assert.equal(gallery.querySelectorAll(".hg-item").length, 1);
+  assert.ok(entry.querySelector(".original-table-placeholder"));
+  assert.equal(entry.querySelectorAll(".original-table-placeholder").length, 1);
+  assert.equal(entry.querySelectorAll(".historical .hg-item img").length, 1);
+  assert.ok(entry.querySelector(".historical").compareDocumentPosition(entry.querySelector(".block")) & 4,
+    "historical gallery precedes source discussion");
+  assert.ok(entry.querySelector("details summary").textContent.includes("Original historical-form table"));
+  assert.match(entry.querySelector(".block").textContent, /Source explanation/);
+});
