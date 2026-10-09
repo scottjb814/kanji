@@ -32,4 +32,4 @@ jobs:
       - name: Install test-only HTML parser
         run: npm install --no-save --no-package-lock --ignore-scripts linkedom@0.18.12
       - name: Test Wiktionary section discovery and image identity
-        run: node --test tests/historical.spec.mjs
+        run: node --test tests/historical.spec.mjs tests/gallery.spec.mjs
