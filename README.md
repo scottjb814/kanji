@@ -128,3 +128,9 @@ file title follows the character-plus-suffix convention. This is explicitly a
 unrecognized titles remain unidentified. Script classification still comes from
 source-table context, never from filenames. Related files such as 學 and 斆 are
 therefore not silently relabeled as 学, and page citations retain their own titles.
+
+## Japanese brush font
+
+The expandable modern brush section includes 衡山毛筆フォント by 青柳衡山. It is self-hosted as 22 Unicode-range WOFF2 chunks (each below 277 KB), loaded only when the section opens. Coverage is derived from actual nonblank outlines and excludes missing glyphs and the blank entries 綻, 詓, 餺, 鰙. The publisher's free-use terms and conversion notes are in `fonts/kouzan/LICENSE-NOTES.md`; this font is not SIL OFL.
+
+To regenerate: download the official TrueType archive linked in those notes, install `fonttools` and `brotli`, then run `python scripts/build_kouzan_font.py /path/to/KouzanMouhitu.ttf`. This preserves original outlines while removing malformed legacy rendering metadata. The script verifies each generated chunk's coverage and outlines. Run `node --test tests/kouzan.test.mjs` afterward.
