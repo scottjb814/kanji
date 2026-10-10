@@ -144,3 +144,21 @@ test("real thumb.wikimedia Japanese URLs deduplicate by file despite tracking pa
   assert.equal(merged.images[0].file.host, "commons.wikimedia.org");
   assert.deepEqual(Array.from(merged.images[0].sources, s => s.edition), ["en", "ja"]);
 });
+
+
+test("catalogue labels support supplementary Han and reject ambiguous file names", () => {
+  const f = fixture();
+  assert.equal(f.forms.fileCharacter({title:"File:學-oracle.svg"}),"學");
+  assert.equal(f.forms.fileCharacter({title:"File:𦥯-seal.svg"}),"𦥯");
+  assert.equal(f.forms.fileCharacter({title:"File:學習.svg"}),null);
+  assert.equal(f.forms.fileCharacter({title:"File:unidentified.svg"}),null);
+});
+
+
+test("shared file retains citations to both modern and traditional pages in one edition", () => {
+  const f=fixture();
+  const record=page=>({edition:"ja",page,sections:["字源"],sectionIds:["字源"],images:[{identity:"File:學-seal.svg",img:f.el("img"),context:"Small seal script"}]});
+  const result=f.forms.merge([[record("学")],[record("學")]]);
+  assert.equal(result.images.length,1);
+  assert.deepEqual(Array.from(result.images[0].sources,x=>x.page),["学","學"]);
+});

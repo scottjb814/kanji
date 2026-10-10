@@ -113,3 +113,18 @@ Run the deterministic DOM regressions after installing the test-only parser:
     node --test tests/*.spec.mjs
 
 Live metadata availability and layout in real browsers remain separate checks.
+
+## Related-form history and catalogue labels
+
+A shinjitai entry combines its own and its linked kyūjitai's historical-image
+sources in the primary gallery. The full traditional-form entry remains in an
+expandable section, including readings, source prose, original tables and modern
+font samples. Failed traditional-source retrieval leaves the primary entry intact
+and can be retried.
+
+Cards and copied attribution identify a single-character label when the hosting
+file title follows the character-plus-suffix convention. This is explicitly a
+**file character label**, not independently verified historical identification;
+unrecognized titles remain unidentified. Script classification still comes from
+source-table context, never from filenames. Related files such as 學 and 斆 are
+therefore not silently relabeled as 学, and page citations retain their own titles.
