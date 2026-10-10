@@ -83,3 +83,33 @@ and collapsed original tables. It saves a screenshot under
 \`test-output/historical-gallery.png\`. Neither Playwright nor the HTML DOM
 test dependency is required by the deployed website. The smoke test is not in
 regular CI because browser setup is disproportionately costly.
+
+
+## Per-image provenance
+
+Every consolidated gallery card includes an attribution status and expandable
+**Image details**, with a hosting-file link where the identity can be resolved.
+`image-provenance.js` batches live Wikimedia file metadata by host and caches it
+for the page session. Local Japanese Wiktionary/Wikipedia files have host-qualified
+identities; they are not conflated with same-named Commons files. External images
+remain visible with source-entry links and an explicit unverified-reuse status.
+Metadata failures offer a retry without hiding the glyph or its source links.
+
+Details distinguish digital-image creator, uploader credit/source/description,
+reported license, original image, and digital-file version timestamp from ancient
+artifact dates. They also retain each Wiktionary page's actual title, revision ID,
+and retrieval time. Source categories are preserved without inferring a script
+from a filename. Image type is not independently verified; uploader descriptions
+are attributed rather than turned into archaeological conclusions.
+
+**Copy attribution** includes available metadata, source revisions, limitations,
+and display modifications (resizing and color inversion when dark mode is active).
+No dictionary explanations are committed, no AI calls are made, and no Worker
+changes are needed. Commons aggregate credits remain explicitly Commons-only;
+the per-image panels cover the whole gallery.
+
+Run the deterministic DOM regressions after installing the test-only parser:
+
+    node --test tests/*.spec.mjs
+
+Live metadata availability and layout in real browsers remain separate checks.

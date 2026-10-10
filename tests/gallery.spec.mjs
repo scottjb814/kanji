@@ -26,6 +26,9 @@ function fixture() {
     return e;
   };
   const ctx = {
+    navigator: { clipboard: { writeText: async () => {} } },
+    getComputedStyle: () => ({ getPropertyValue: () => "none" }),
+    apiGet: () => Promise.resolve({}),
     document, URL, el: node,
     glyphImg: (img,alt) => node("img", { src: img.getAttribute("src"), alt }),
     wiktUrl: (char,lang) => "https://" + lang + ".wiktionary.org/wiki/" + encodeURIComponent(char),
@@ -41,6 +44,8 @@ function fixture() {
     }) } }
   };
   vm.createContext(ctx);
+  vm.runInContext(readFileSync(new URL("../image-provenance.js", import.meta.url), "utf8"), ctx);
+  ctx.window.KanjiImageProvenance = ctx.KanjiImageProvenance;
   vm.runInContext(source, ctx);
   return { document, node, ctx, calls };
 }
@@ -116,7 +121,7 @@ test("failed edition shows partial English results and a retry action",async () 
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(slot.querySelectorAll(".hg-item").length,1);
   assert.match(slot.textContent,/results may be incomplete/);
-  assert.equal(slot.querySelectorAll("button").length,1);
+  assert.equal(slot.querySelectorAll(".hg-warning button").length,1);
 });
 
 test("renderEntry positions one gallery before explanations and collapses the original table", async () => {
@@ -153,7 +158,7 @@ test("renderEntry positions one gallery before explanations and collapses the or
   assert.equal(entry.querySelectorAll(".historical .hg-item img").length, 1);
   assert.ok(entry.querySelector(".historical").compareDocumentPosition(entry.querySelector(".block")) & 4,
     "historical gallery precedes source discussion");
-  assert.ok(entry.querySelector("details summary").textContent.includes("Original historical-form table"));
+  assert.ok(entry.querySelector(".block details summary").textContent.includes("Original historical-form table"));
   assert.match(entry.querySelector(".block").textContent, /Source explanation/);
 });
 
@@ -171,3 +176,4 @@ test("two citations from one Wiktionary edition use one chip with a section deep
   assert.match(sources[0].getAttribute("title"),/Translingual › Han character/);
   assert.equal(sources[1].getAttribute("href"),"https://ja.wiktionary.org/wiki/%E5%AD%97#%E5%AD%97%E6%BA%90");
 });
+
