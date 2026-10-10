@@ -140,6 +140,16 @@ a.k { text-decoration-style: dotted; text-decoration-color: var(--seal); }
 .historical .hg-warning { margin: 9px 0; font-size: 13px; }
 .historical .hg-warning button { min-height: 32px; padding: 0 10px; margin-left: 8px; font-size: 12px; }
 
+/* Per-image provenance stays inside the gallery strip without widening the page. */
+.hg-attribution { font: 11.5px/1.4 var(--ui); margin: 6px 0; overflow-wrap: anywhere; }
+.hg-details summary { font-size: 12px; padding: 7px; }
+.hg-detail-body { font: 12px/1.5 var(--ui); overflow-wrap: anywhere; }
+.hg-detail-body p { margin: 8px 0; }
+.historical .hg-item:has(.hg-details[open]) { width: min(310px, 78vw); }
+.hg-details[open] { width: 100%; }
+.hg-details button { font-size: 12px; padding: 5px 8px; }
+.hg-copy-status { font-size: 12px; }
+
 /* Historical forms strip */
 .forms {
   display: flex; gap: 8px; overflow-x: auto;
@@ -258,13 +268,14 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
   <a href="https://zh.wiktionary.org/" target="_blank" rel="noopener">Chinese Wiktionary</a> (CC BY-SA).
   說文解字 text and seal-script images: <a href="https://zh.wikisource.org/wiki/%E8%AA%AA%E6%96%87%E8%A7%A3%E5%AD%97" target="_blank" rel="noopener">Chinese Wikisource</a>
   (the work is in the public domain; the transcription is a Wikimedia contribution, CC BY-SA unless a page says otherwise).
-  Form images come from <a href="https://commons.wikimedia.org/" target="_blank" rel="noopener">Wikimedia Commons</a>; each entry's "Image credits" lists their licences.
+  Form images are discovered through Wiktionary and may be hosted on <a href="https://commons.wikimedia.org/" target="_blank" rel="noopener">Wikimedia Commons</a>, local Wikimedia projects, or other source hosts; each image's details reports available attribution and reuse information.
   <span id="brushfoot" hidden>Brush renderings: fonts LXGW WenKai TC, Klee One and Liu Jian Mao Cao, served by <a href="https://fonts.google.com/" target="_blank" rel="noopener">Google Fonts</a> (SIL Open Font License 1.1). They are modern typefaces, not historical manuscripts.</span>
   <span id="kpfoot" hidden>なりたち text: <a href="https://www.kanjipedia.jp/" target="_blank" rel="noopener">漢字ペディア</a>, 公益財団法人 日本漢字能力検定協会 (from 角川新字源), fetched live through a private proxy for the site owner; nothing is stored.</span>
   <span id="moefoot" hidden>字樣說明 text: 教育部《<a href="https://dict.variants.moe.edu.tw/" target="_blank" rel="noopener">異體字字典</a>》, Ministry of Education, Taiwan.</span>
 </footer>
 
 <script src="historical-forms.js"></script>
+<script src="image-provenance.js"></script>
 <script>
 (() => {
   "use strict";
@@ -298,7 +309,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
   let sendUA = true;   // drop the Api-User-Agent header if the CORS preflight fails
   async function fetchPage(title) {
     const p = new URLSearchParams({
-      action: "parse", page: title, prop: "text", disableeditsection: "1",
+      action: "parse", page: title, prop: "text|revid", disableeditsection: "1",
       redirects: "1", format: "json", formatversion: "2", origin: "*"
     });
     const url = `${API}?${p}`;
@@ -316,7 +327,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
       if (j.error.code === "missingtitle") return { missing: true, title };
       throw new Error(j.error.info || j.error.code);
     }
-    return { title: j.parse.title, html: j.parse.text };
+    return { title: j.parse.title, html: j.parse.text, revision: j.parse.revid, checkedAt: new Date().toISOString() };
   }
 
   // Same request shape as fetchPage, for the other wikis.
@@ -336,9 +347,18 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
     return j;
   }
 
+  function snapshot(data, page) {
+    for (const record of data.historical || []) {
+      record.page = page.title;
+      record.revision = Number.isSafeInteger(page.revision) ? page.revision : null;
+      record.checkedAt = page.checkedAt;
+    }
+    return data;
+  }
+
   function lookup(title) {
     if (!cache.has(title)) {
-      const pr = fetchPage(title).then(d => d.missing ? d : { ...extract(d.html, title), title: d.title });
+      const pr = fetchPage(title).then(d => d.missing ? d : snapshot({ ...extract(d.html, title), title: d.title }, d));
       pr.catch(() => cache.delete(title));
       cache.set(title, pr);
     }
@@ -411,8 +431,8 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
   const jaCache = new Map();
   function lookupJa(title) {
     if (!jaCache.has(title)) {
-      const pr = apiGet("ja.wiktionary.org", { action: "parse", page: title, prop: "text", disableeditsection: "1", redirects: "1" })
-        .then(j => extractJa(j.parse.text))
+      const pr = apiGet("ja.wiktionary.org", { action: "parse", page: title, prop: "text|revid", disableeditsection: "1", redirects: "1" })
+        .then(j => snapshot(extractJa(j.parse.text), { title: j.parse.title, revision: j.parse.revid, checkedAt: new Date().toISOString() }))
         .catch(e => { if (e.code === "missingtitle") return { missing: true, blocks: [] }; throw e; });
       pr.catch(() => jaCache.delete(title));
       jaCache.set(title, pr);
@@ -791,8 +811,8 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
   const zhCache = new Map();
   function lookupZh(title) {
     if (!zhCache.has(title)) {
-      const pr = apiGet("zh.wiktionary.org", { action: "parse", page: title, prop: "text", disableeditsection: "1", redirects: "1" })
-        .then(j => extractZh(j.parse.text))
+      const pr = apiGet("zh.wiktionary.org", { action: "parse", page: title, prop: "text|revid", disableeditsection: "1", redirects: "1" })
+        .then(j => snapshot(extractZh(j.parse.text), { title: j.parse.title, revision: j.parse.revid, checkedAt: new Date().toISOString() }))
         .catch(e => { if (e.code === "missingtitle") return { missing: true, blocks: [] }; throw e; });
       pr.catch(() => zhCache.delete(title));
       zhCache.set(title, pr);
@@ -1013,7 +1033,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
     if (!titles.length) return null;
     const body = el("div", { class: "cr-body" }, el("p", { class: "muted", text: "Loading…" }));
     const d = el("details", { class: "credits" },
-      el("summary", { text: `Image credits (${titles.length} image${titles.length > 1 ? "s" : ""})` }), body);
+      el("summary", { text: `Commons image credits (${titles.length} image${titles.length > 1 ? "s" : ""})` }), body);
     let started = false;
     const load = async () => {
       try {
@@ -1313,6 +1333,8 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
   const HISTORICAL_ORDER = ["Oracle bone", "Bronze", "Bamboo and silk", "Seal", "Clerical", "Other forms"];
   const EDITION_NAMES = { en: "English Wiktionary", ja: "Japanese Wiktionary", zh: "Chinese Wiktionary" };
 
+  const resolveImageCredits = window.KanjiImageProvenance.createResolver(apiGet);
+
   function renderHistorical(ch, combined) {
     const root = el("div");
     if (!combined.images.length) {
@@ -1333,14 +1355,15 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
       const strip = el("div", { class: "forms", role: "list", "aria-label": label + " historical glyphs" });
       for (const item of group) {
         const file = item.identity.startsWith("File:") ? item.identity.slice(5) : null;
-        const href = file ? "https://commons.wikimedia.org/wiki/File:" + encodeURIComponent(file.replace(/ /g, "_")) : null;
+        const href = item.file && window.KanjiImageProvenance ? window.KanjiImageProvenance.fileUrl(item.file)
+          : file ? "https://commons.wikimedia.org/wiki/File:" + encodeURIComponent(file.replace(/ /g, "_")) : null;
         const context = (item.context || "").trim();
         const labelText = context && context !== label ? context.slice(0, 110) : "";
         const outer = el("div", { class: "hg-item", role: "listitem" });
         const link = el(href ? "a" : "div", {
           class: "form", href, target: href ? "_blank" : null, rel: href ? "noopener" : null,
-          title: href ? "View image information and licence on Wikimedia Commons" : null,
-          "aria-label": href ? "Historical glyph of " + ch + ", " + label + "; Wikimedia Commons file" : null
+          title: href ? "View hosting file information and licence" : null,
+          "aria-label": href ? "Historical glyph of " + ch + ", " + label + "; hosting file" : null
         });
         link.append(glyphImg(item.img, "Historical glyph of " + ch + ", " + label));
         if (labelText) link.append(el("div", { class: "period", text: labelText }));
@@ -1355,7 +1378,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
           const sourceName = EDITION_NAMES[edition] || edition;
           const fullPaths = [...new Set(locations.map(o => o.sections.join(" › ")))].join("; ");
           const anchored = locations.find(o => o.anchor) || locations[0];
-          const url = wiktUrl(ch, edition) + (anchored.anchor ? "#" + encodeURIComponent(anchored.anchor) : "");
+          const url = wiktUrl(anchored.page || ch, edition) + (anchored.anchor ? "#" + encodeURIComponent(anchored.anchor) : "");
           sources.append(el("a", {
             href: url, target: "_blank", rel: "noopener",
             title: sourceName + ": " + fullPaths,
@@ -1364,6 +1387,10 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
           }));
         }
         outer.append(sources);
+        if (window.KanjiImageProvenance) outer.append(...window.KanjiImageProvenance.details(item, ch, {
+          el, resolve: resolveImageCredits, clipboard: navigator.clipboard,
+          isDark: () => getComputedStyle(document.documentElement).getPropertyValue("--glyph-filter").trim() === "invert(1)"
+        }));
         strip.append(outer);
       }
       area.append(strip);
@@ -1419,7 +1446,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
     if (note) box.append(note);
     const historical = el("section", { class: "historical" },
       el("h3", { text: "Historical forms" }),
-      el("p", { class: "historical-intro", text: "Images from Wikimedia Commons. EN, JA and ZH link to the Wiktionary pages where each image appears." }));
+      el("p", { class: "historical-intro", text: "Images from Wikimedia and other source hosts. EN, JA and ZH link to the source entries. Each card reports its own attribution status; uncertain script categories remain under Other forms." }));
     const historicalBody = el("div");
     historical.append(historicalBody);
     box.append(historical);
@@ -1615,3 +1642,4 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
 </script>
 </body>
 </html>
+

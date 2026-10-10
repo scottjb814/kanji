@@ -39,7 +39,9 @@ try {
     await route.fulfill({
       status: 200, contentType: "application/json",
       headers: { "access-control-allow-origin": "*" },
-      body: JSON.stringify({ parse: { title: "牛", text: html } })
+      body: JSON.stringify(new URL(route.request().url()).searchParams.get("action") === "query"
+        ? { query: { pages: ["Shared.svg", "English.svg", "Japanese.svg", "Chinese.svg"].map(name => ({ title: "File:" + name, imageinfo: [{ url: "https://upload.wikimedia.org/" + name, descriptionurl: "https://commons.wikimedia.org/wiki/File:" + name, timestamp: "2026-01-01T00:00:00Z", extmetadata: { LicenseShortName: {value: "Public domain"}, Artist: {value: "Synthetic creator"} } }] })) } }
+        : { parse: { title: "牛", revid: 12345, text: html } })
     });
   });
   await page.route("**/data/kanjidic.json", async route => {
@@ -72,6 +74,11 @@ try {
   assert.ok(counts.originalTables >= 1, "retain source tables as collapsed reference");
   assert.match(counts.prose || "", /English source explanation/);
   assert.ok(counts.sharedLinks.some(x=>x.href?.includes("Shared.svg") && x.editions.includes("EN") && x.editions.includes("JA")));
+  await page.waitForFunction(() => Array.from(document.querySelectorAll(".hg-attribution")).every(n => n.textContent.includes("Credits available")));
+  assert.equal(await page.locator(".hg-details").count(), 4);
+  await page.locator(".hg-details summary").first().click();
+  assert.ok(await page.locator(".hg-details[open] a[href*=\"oldid=12345\"]").count());
+  assert.match(await page.locator(".hg-details[open]").innerText(), /not artifact date/);
   assert.equal(consoleErrors.length, 0, "no browser JavaScript errors");
   await mkdir("test-output", { recursive: true });
   await page.screenshot({ path: "test-output/historical-gallery.png", fullPage: true });
@@ -81,3 +88,4 @@ try {
   if (browser) await browser.close();
   server.kill();
 }
+

@@ -22,21 +22,37 @@
     return null;
   }
 
-  function imageIdentity(img) {
-    const anchor = img.closest("a[href]");
-    if (anchor) {
-      const href = anchor.getAttribute("href") || "";
-      const m = href.match(/(?:\/wiki\/|\/wiki\/Special:FilePath\/)(?:File:|%46ile%3A|文件:|檔案:)([^#?]+)/i);
-      if (m) {
-        try { return "File:" + decodeURIComponent(m[1]).replace(/_/g, " ").normalize("NFC"); }
-        catch { return "File:" + m[1].replace(/_/g, " ").normalize("NFC"); }
+  function fileReference(img, edition = "en") {
+    const src = img.getAttribute("src") || img.getAttribute("data-src") || "";
+    try {
+      const url = new URL(src, "https://" + edition + ".wiktionary.org");
+      if (/^(upload|thumb)\.wikimedia\.org$/.test(url.hostname)) {
+        const bits = url.pathname.split("/");
+        const project = bits[1], language = bits[2];
+        const filename = bits[3] === "thumb" ? bits[6] : bits[5];
+        const host = project === "wikipedia" && language === "commons" ? "commons.wikimedia.org"
+          : /^(wikipedia|wiktionary)$/.test(project) && /^(en|ja|zh)$/.test(language) ? language + "." + project + ".org" : null;
+        if (host && filename) return { host, title: "File:" + decodeURIComponent(filename).replace(/_/g, " ").normalize("NFC") };
       }
-    }
+      const href = img.closest("a[href]")?.getAttribute("href");
+      if (href) {
+        const link = new URL(href, "https://" + edition + ".wiktionary.org");
+        const match = decodeURIComponent(link.pathname).match(/^\/wiki\/(?:File:|Image:|文件:|檔案:|ファイル:)(.+)$/i);
+        if (match && /^(commons\.wikimedia\.org|(?:en|ja|zh)\.(?:wiktionary|wikipedia)\.org)$/.test(link.hostname))
+          return { host: link.hostname, title: "File:" + match[1].replace(/_/g, " ").normalize("NFC") };
+      }
+    } catch { /* Unknown/malformed file locations stay unresolved. */ }
+    return null;
+  }
+
+  function imageIdentity(img, edition = "en") {
+    const reference = fileReference(img, edition);
+    if (reference) return reference.host === "commons.wikimedia.org" ? reference.title : "WikiFile:" + reference.host + ":" + reference.title;
     const src = img.getAttribute("src") || img.getAttribute("data-src") || "";
     if (!src) return null;
     try {
       const url = new URL(src.startsWith("//") ? "https:" + src : src, "https://upload.wikimedia.org");
-      if (url.hostname === "upload.wikimedia.org") {
+      if (/^(upload|thumb)\.wikimedia\.org$/.test(url.hostname)) {
         const bits = url.pathname.split("/");
         if (bits[1] === "wikipedia" && bits[2] === "commons") {
           const file = bits[3] === "thumb" ? bits[6] : bits[5];
@@ -119,7 +135,7 @@
         if (visited.has(table) || !isHistoricalTable(table, path)) continue;
         visited.add(table);
         const images = [...table.querySelectorAll("img")]
-          .map(img => ({ identity: imageIdentity(img), img, context: imageContext(img, table) }))
+          .map(img => ({ identity: imageIdentity(img, edition), file: fileReference(img, edition), img, context: imageContext(img, table) }))
           .filter(item => item.identity);
         // Empty tables aren't evidence of glyph images. Historical text-only
         // cells remain eligible for the old renderer, but not image dedup.
@@ -137,7 +153,7 @@
       for (const item of record.images) {
         let found = byIdentity.get(item.identity);
         if (!found) {
-          found = { identity: item.identity, img: item.img, context: item.context, group: scriptGroup(item.context || ""), sources: [] };
+          found = { identity: item.identity, file: item.file, img: item.img, context: item.context, group: scriptGroup(item.context || ""), sources: [] };
           byIdentity.set(item.identity, found);
         }
         if (found.group === "Other forms" && scriptGroup(item.context || "") !== "Other forms") {
@@ -145,7 +161,7 @@
           found.group = scriptGroup(item.context);
         }
         const lastAnchor = (record.sectionIds || []).filter(Boolean).at(-1) || null;
-        const source = { edition: record.edition, sections: [...record.sections], anchor: lastAnchor };
+        const source = { edition: record.edition, sections: [...record.sections], anchor: lastAnchor, page: record.page, revision: record.revision, checkedAt: record.checkedAt };
         if (!found.sources.some(s => s.edition === source.edition && s.sections.join("\u001f") === source.sections.join("\u001f"))) {
           found.sources.push(source);
         }
@@ -154,5 +170,6 @@
     return { records, images: [...byIdentity.values()] };
   }
 
-  scope.KanjiHistoricalForms = Object.freeze({ collect, merge, imageIdentity, headingOf, imageContext, scriptGroup });
+  scope.KanjiHistoricalForms = Object.freeze({ collect, merge, imageIdentity, fileReference, headingOf, imageContext, scriptGroup });
 })(globalThis);
+
