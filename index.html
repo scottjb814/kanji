@@ -1359,15 +1359,20 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
           : file ? "https://commons.wikimedia.org/wiki/File:" + encodeURIComponent(file.replace(/ /g, "_")) : null;
         const context = (item.context || "").trim();
         const labelText = context && context !== label ? context.slice(0, 110) : "";
+        const catalogue = window.KanjiHistoricalForms.fileCharacter?.(item.file) || null;
+        const imageLabel = catalogue ? "Historical image; hosting file labeled " + catalogue : "Historical image found in sources for " + ch + "; catalogued character not identified";
         const outer = el("div", { class: "hg-item", role: "listitem" });
         const link = el(href ? "a" : "div", {
           class: "form", href, target: href ? "_blank" : null, rel: href ? "noopener" : null,
           title: href ? "View hosting file information and licence" : null,
-          "aria-label": href ? "Historical glyph of " + ch + ", " + label + "; hosting file" : null
+          "aria-label": href ? imageLabel + ", " + label + "; hosting file" : null
         });
-        link.append(glyphImg(item.img, "Historical glyph of " + ch + ", " + label));
+        link.append(glyphImg(item.img, imageLabel + ", " + label));
         if (labelText) link.append(el("div", { class: "period", text: labelText }));
         outer.append(link);
+        outer.append(el("p", { class: "hg-attribution hg-character", text: catalogue
+          ? "File character label: " + catalogue
+          : "Catalogued character not identified" }));
         const sources = el("div", { class: "hg-sources", "aria-label": "Wiktionary sources" });
         const editions = new Map();
         for (const origin of item.sources) {
@@ -1407,7 +1412,10 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
     const run = async () => {
       const id = ++generation;
       slot.replaceChildren(el("p", { class: "muted", text: "Collecting historical glyphs from Wiktionary…" }));
-      const results = await Promise.allSettled([lookupJa(ch), lookupZh(ch)]);
+      const related = data.kyujitai && data.kyujitai !== ch ? data.kyujitai : null;
+      const requests = [lookupJa(ch), lookupZh(ch)];
+      if (related) requests.push(lookup(related), lookupJa(related), lookupZh(related));
+      const results = await Promise.allSettled(requests);
       if (id !== generation || !box.isConnected) return;
       const histories = [data.historical || []];
       for (const result of results) {
@@ -1415,6 +1423,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
       }
       const merged = window.KanjiHistoricalForms.merge(histories);
       slot.replaceChildren(renderHistorical(ch, merged));
+      if (related) slot.prepend(el("p", { class: "note", text: "Includes source images for " + ch + " and its kyūjitai " + related + ". File character labels identify the host’s catalogue labels; they do not independently establish a historical relationship." }));
       creditsSlot.replaceChildren();
       const credits = creditsFor(box);
       if (credits) creditsSlot.append(credits);
@@ -1430,7 +1439,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
   }
 
   // ---------- Rendering ----------
-  function renderEntry(ch, data, { secondary = false, note = null, kd = null } = {}) {
+  function renderEntry(ch, data, { secondary = false, note = null, kd = null, gallery = true } = {}) {
     const box = el("section", { class: "entry" + (secondary ? " secondary" : ""), lang: "en", "data-kanji": ch });
     const head = el("div", { class: "head" },
       el("div", { class: "seal", lang: "ja", text: ch, "aria-hidden": "true" }),
@@ -1449,13 +1458,13 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
       el("p", { class: "historical-intro", text: "Images from Wikimedia and other source hosts. EN, JA and ZH link to the source entries. Each card reports its own attribution status; uncertain script categories remain under Other forms." }));
     const historicalBody = el("div");
     historical.append(historicalBody);
-    box.append(historical);
+    if (gallery) box.append(historical);
     const creditsSlot = el("div", { class: "historical-credits" });
     const finish = () => {
       if (BRUSH_INLINE) box.append(brushFor(ch));
       box.append(creditsSlot);
       box.append(extrasFor(ch, data.kyujitai));
-      hydrateHistorical(box, ch, data, historicalBody, creditsSlot);
+      if (gallery) hydrateHistorical(box, ch, data, historicalBody, creditsSlot);
       return box;
     };
 
@@ -1529,7 +1538,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
         const note = el("p", { class: "note" },
           "Japanese shinjitai (new form). Its kyūjitai (traditional form) is ",
           el("a", { href: wiktUrl(kyu), class: "k", "data-k": kyu, lang: "ja", text: kyu }),
-          ". The traditional form's history is shown below.");
+          ". Its historical images are included here; full traditional-form sources are expandable below.");
         nodes.push(renderEntry(ch, data, { note }));
       } else {
         nodes.push(renderEntry(ch, data));
@@ -1538,12 +1547,24 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
       fillKD(kdData);
 
       if (kyu) {
-        const pending = el("div", { class: "status", text: "Looking up " + kyu + "…" });
-        out.append(pending);
-        const k = await lookup(kyu);
-        if (id !== reqId) return;
-        pending.replaceWith(renderEntry(kyu, { ...k, kyujitai: null }, { secondary: true }));
-        fillKD(kdData);
+        const body = el("div", {}, el("p", { class: "muted", text: "Loading traditional-form sources…" }));
+        const details = el("details", { class: "related-sources" },
+          el("summary", { text: kyu + " · Full kyūjitai sources and readings" }), body);
+        out.append(details);
+        const loadRelated = async () => {
+          try {
+            const k = await lookup(kyu);
+            if (id !== reqId) return;
+            body.replaceChildren(renderEntry(kyu, { ...k, kyujitai: null }, { secondary: true, gallery: false }));
+            fillKD(kdData);
+          } catch {
+            if (id !== reqId) return;
+            const retry = el("button", { type: "button", text: "Retry traditional-form sources" });
+            retry.addEventListener("click", loadRelated);
+            body.replaceChildren(el("p", { class: "muted", text: "Traditional-form sources unavailable. The primary entry remains available." }), retry);
+          }
+        };
+        loadRelated();
       }
     } catch (e) {
       if (id !== reqId) return;

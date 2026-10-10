@@ -82,6 +82,8 @@
   }
   function attribution(item, info, character, dark) {
     const lines = [info?.title || item.file?.title || "Historical-form image for " + character];
+    const catalogue = scope.KanjiHistoricalForms?.fileCharacter?.(item.file);
+    lines.push("Hosting file character label: " + (catalogue || "Not identified") + " (catalogue label, not independent historical identification)");
     lines.push("Hosting file: " + (info?.hostUrl || fileUrl(item.file) || "Not resolved"));
     const original = info?.original || (item.identity?.startsWith("URL:") ? safeUrl(item.identity.slice(4)) : null);
     if (original) lines.push("Original digital image: " + original);
@@ -119,6 +121,8 @@
     });
     function render() {
       body.replaceChildren(field("File", info?.title || item.file?.title || "Hosting file not resolved"));
+      body.append(field("Hosting file character label", scope.KanjiHistoricalForms?.fileCharacter?.(item.file) || "Not identified"));
+      body.append(el("p", {text: "The file character label is a catalogue label, not independent historical identification."}));
       const hostLink = link("Hosting file & history", info?.hostUrl || fileUrl(item.file));
       if (hostLink) body.append(el("p", {}, hostLink));
       const originalLink = link("Original digital image", info?.original || (item.identity?.startsWith("URL:") ? safeUrl(item.identity.slice(4)) : null));

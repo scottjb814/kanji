@@ -46,6 +46,8 @@ function fixture() {
   vm.createContext(ctx);
   vm.runInContext(readFileSync(new URL("../image-provenance.js", import.meta.url), "utf8"), ctx);
   ctx.window.KanjiImageProvenance = ctx.KanjiImageProvenance;
+  vm.runInContext(readFileSync(new URL("../historical-forms.js", import.meta.url), "utf8"), ctx);
+  ctx.window.KanjiHistoricalForms.fileCharacter = ctx.KanjiHistoricalForms.fileCharacter;
   vm.runInContext(source, ctx);
   return { document, node, ctx, calls };
 }
@@ -75,8 +77,8 @@ test("renders one Commons image link and two separate source edition links", () 
   const gallery=f.ctx.renderHistorical("牛",{images:[im]});
   const commons=gallery.querySelector("a.form");
   assert.equal(commons.getAttribute("href"),"https://commons.wikimedia.org/wiki/File:Bronze_character.svg");
-  assert.match(commons.getAttribute("aria-label"),/Historical glyph of 牛/);
-  assert.equal(commons.querySelector("img").getAttribute("alt"),"Historical glyph of 牛, Bronze");
+  assert.match(commons.getAttribute("aria-label"),/Historical image found in sources for 牛/);
+  assert.equal(commons.querySelector("img").getAttribute("alt"),"Historical image found in sources for 牛; catalogued character not identified, Bronze");
   const sources=Array.from(gallery.querySelectorAll(".hg-sources a"));
   assert.deepEqual(sources.map(n=>n.textContent),["EN","JA"]);
   assert.equal(sources[0].getAttribute("href"),"https://en.wiktionary.org/wiki/%E7%89%9B");
@@ -160,6 +162,10 @@ test("renderEntry positions one gallery before explanations and collapses the or
     "historical gallery precedes source discussion");
   assert.ok(entry.querySelector(".block details summary").textContent.includes("Original historical-form table"));
   assert.match(entry.querySelector(".block").textContent, /Source explanation/);
+  const related = f.ctx.renderEntry("惡", data, {secondary:true,gallery:false});
+  assert.equal(related.querySelector(".historical"),null);
+  assert.ok(related.querySelector(".original-table-placeholder"));
+  assert.match(related.querySelector(".block").textContent,/Source explanation/);
 });
 
 test("two citations from one Wiktionary edition use one chip with a section deep link", () => {
@@ -177,3 +183,27 @@ test("two citations from one Wiktionary edition use one chip with a section deep
   assert.equal(sources[1].getAttribute("href"),"https://ja.wiktionary.org/wiki/%E5%AD%97#%E5%AD%97%E6%BA%90");
 });
 
+
+
+test("related files carry their own catalogue label in caption and accessible text", () => {
+  const f = fixture();
+  const im = image(f, "斆-seal.svg", "Seal", "Small seal script", [sourceInfo("ja", ["字源"])]);
+  im.file = {host: "commons.wikimedia.org", title: "File:斆-seal.svg"};
+  const gallery = f.ctx.renderHistorical("学", {images: [im]});
+  assert.match(gallery.querySelector(".hg-character").textContent, /斆/);
+  assert.match(gallery.querySelector("img").alt, /hosting file labeled 斆/);
+  assert.doesNotMatch(gallery.querySelector("img").alt, /glyph of 学/);
+});
+
+test("primary gallery gathers traditional sources without substituting their page citations", async () => {
+  const f = fixture(); const requested = [];
+  f.ctx.lookup = ch => { requested.push(ch); return Promise.resolve({historical: [{images: [image(f,"惡-seal.svg","Seal","Small seal script",[{...sourceInfo("en",["Glyph origin"]),page:ch}])]}]}); };
+  const box=f.node("section"), slot=f.node("div"), credits=f.node("div");
+  box.append(slot,credits); f.document.body.append(box);
+  f.ctx.hydrateHistorical(box,"悪",{historical:[],kyujitai:"惡"},slot,credits);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(requested,["惡"]);
+  assert.equal(slot.querySelectorAll(".hg-item").length,1);
+  assert.match(slot.querySelector(".note").textContent,/kyūjitai 惡/);
+  assert.match(slot.querySelector(".hg-sources a").href,/%E6%83%A1/);
+});

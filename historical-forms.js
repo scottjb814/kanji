@@ -45,6 +45,12 @@
     return null;
   }
 
+  // A hosting-file label identifies the catalogue label, not an independently
+  // established historical relationship. Never infer script or date from it.
+  function fileCharacter(file) {
+    return file?.title?.match(/^File:(\p{Script=Han})(?:[- _]|\.[a-z])/u)?.[1] || null;
+  }
+
   function imageIdentity(img, edition = "en") {
     const reference = fileReference(img, edition);
     if (reference) return reference.host === "commons.wikimedia.org" ? reference.title : "WikiFile:" + reference.host + ":" + reference.title;
@@ -162,7 +168,7 @@
         }
         const lastAnchor = (record.sectionIds || []).filter(Boolean).at(-1) || null;
         const source = { edition: record.edition, sections: [...record.sections], anchor: lastAnchor, page: record.page, revision: record.revision, checkedAt: record.checkedAt };
-        if (!found.sources.some(s => s.edition === source.edition && s.sections.join("\u001f") === source.sections.join("\u001f"))) {
+        if (!found.sources.some(s => s.edition === source.edition && s.page === source.page && s.sections.join("\u001f") === source.sections.join("\u001f"))) {
           found.sources.push(source);
         }
       }
@@ -170,6 +176,6 @@
     return { records, images: [...byIdentity.values()] };
   }
 
-  scope.KanjiHistoricalForms = Object.freeze({ collect, merge, imageIdentity, fileReference, headingOf, imageContext, scriptGroup });
+  scope.KanjiHistoricalForms = Object.freeze({ collect, merge, imageIdentity, fileReference, fileCharacter, headingOf, imageContext, scriptGroup });
 })(globalThis);
 
