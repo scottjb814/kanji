@@ -940,11 +940,12 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
       });
       go();
     };
-    run(SW_T, () => shuowenFor(ch), r => renderSw(r, ch));
-    if (MOE_INLINE) run(MOE_T, () => lookupMoe(ch), r => renderMoe(r, ch));
+    // Reserve source positions before loading; responses and retries stay in place.
     if (KP_INLINE) run(KP_T, () => lookupKp(ch), r => renderKp(r, ch));
     run(JA_T, () => lookupJa(ch), d => renderJa(d, ch));
     run(ZH_T, () => lookupZh(ch), d => renderZh(d, ch));
+    if (MOE_INLINE) run(MOE_T, () => lookupMoe(ch), r => renderMoe(r, ch));
+    run(SW_T, () => shuowenFor(ch), r => renderSw(r, ch));
     grid.append(dictCard(ch, kyu));
     return wrap;
   }
