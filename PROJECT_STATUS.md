@@ -9,10 +9,10 @@
 
 ## Production baseline
 
-- **Latest successful GitHub Pages deployment:** `main` commit [`a72c22d22588f9816bceb93358a00f02103075d9`](https://github.com/scottjb814/kanji/commit/a72c22d22588f9816bceb93358a00f02103075d9), merged through PR #9 on October 10, 2026.
-- **Pages publication:** [Build and deploy run 38080706920](https://github.com/scottjb814/kanji/actions/runs/38080706920) passed; both build and deploy jobs were checked during this refresh.
-- **Post-merge checks:** [Run 38080706912](https://github.com/scottjb814/kanji/actions/runs/38080706912) passed for the same commit.
-- **Verification limits:** This refresh checked repository state and Actions records, not the currently served assets or an interactive browser session. The earlier [published-asset check 37865217495](https://github.com/scottjb814/kanji/actions/runs/37865217495) covered the PR #4 release and must not be treated as verification of the latest release.
+- **Latest successful GitHub Pages deployment:** `main` commit [`4184e25676abeada5cd63b06d6682c384ef079ad`](https://github.com/scottjb814/kanji/commit/4184e25676abeada5cd63b06d6682c384ef079ad), merged through PR #10 on October 10, 2026.
+- **Pages publication:** [Build and deploy run 38099578679](https://github.com/scottjb814/kanji/actions/runs/38099578679) passed; both build and deploy jobs were checked during this refresh.
+- **Post-merge checks:** [Run 38099578700](https://github.com/scottjb814/kanji/actions/runs/38099578700) passed for the same commit.
+- **Published assets checked:** After the PR #10 deployment, the live HTML returned HTTP 200 and its Other accounts calls were verified in the order KP, JA, ZH, MOE, SW. `historical-forms.js`, `image-provenance.js`, `data/shuowen_index.json`, and deployment-generated `data/kanjidic.json` also returned HTTP 200. No interactive browser check was performed for this release.
 - **Earlier browser evidence:** The previous snapshot records a 390-pixel Chromium test with synthetic Wiktionary responses ([run 37863267835](https://github.com/scottjb814/kanji/actions/runs/37863267835)), covering grouping, deduplication, links, credits, and original tables. This is historical evidence, not a new live-site check.
 - **Cloudflare Worker (prior snapshot; not rechecked):** Deployed separately by the site owner. [Eight token-free live checks](https://github.com/scottjb814/kanji/actions/runs/37864459489) passed (authentication, CORS, and error handling). The site owner subsequently confirmed authenticated Kanjipedia なりたち displayed successfully. Worker source changes in GitHub do **not** automatically deploy to Cloudflare.
 
@@ -29,10 +29,11 @@
 | [#8](https://github.com/scottjb814/kanji/pull/8) | Merged | Lazy-loaded Kouzan brush font with explicit glyph-coverage checks |
 | [#9](https://github.com/scottjb814/kanji/pull/9) | Merged | Yuji Boku replaces LXGW; modern brush samples reordered |
 
-## Open work
+## Release and documentation status
 
-- [Draft PR #10](https://github.com/scottjb814/kanji/pull/10), `fix/other-accounts-order`: orders Other accounts as Kanjipedia → ja.Wiktionary → zh.Wiktionary → Taiwan MOE → zh.Wikisource (說文解字). It preserves independent loading, optional-source flags, retry positions, and the final link-only dictionary card. Five new DOM regression cases cover these behaviors, missing entries, and multiple Wiktionary blocks. [Branch checks](https://github.com/scottjb814/kanji/actions/runs/38099183042) and [PR checks](https://github.com/scottjb814/kanji/actions/runs/38099266714) passed on `8b8da80045271e8b5b49649c64c635106053eed1`. Optional live-source and browser checks were not run. **Not merged or deployed.**
-- [Draft PR #5](https://github.com/scottjb814/kanji/pull/5) introduces this status document; it is not yet on main. This refresh updates that existing documentation branch. Both drafts await review and explicit merge authorization.
+- [PR #10](https://github.com/scottjb814/kanji/pull/10) is merged and deployed. Other accounts now appears as Kanjipedia → ja.Wiktionary → zh.Wiktionary → Taiwan MOE → zh.Wikisource (說文解字), preserving independent loading, optional-source flags, retries, and the final link-only dictionary card. Five new DOM regression cases cover ordering, missing entries, multiple Wiktionary blocks, failures/retries, and optional sources. Both PR checks and the post-merge suite passed.
+- [PR #5](https://github.com/scottjb814/kanji/pull/5) introduces this status document. The user authorized its merge together with deployment. The baseline above records the verified application release immediately before this documentation-only merge; the documentation merge triggers another Pages run without changing application assets.
+- No other feature PR was open when this release was checked. Consult the current PR list before starting new work.
 
 ## Current implementation
 
@@ -46,9 +47,8 @@
 
 ## Next priorities
 
-1. **Review pending drafts:** Review the source-order change in PR #10 and this status refresh in PR #5. Merge/deploy only after authorization; then update the deployment commit and verification evidence.
-2. **Post-release visual evaluation:** Inspect real live entries for 討, 牛, 字, 悪/惡, and 学/學 on desktop/mobile. Check classification, image provenance, accessibility, failed-image behavior, and text-only historical forms. This manual review has not been recorded as complete.
-3. **Source and variant reliability:** Improve only when specific evidence shows a gap, especially upstream Wiktionary HTML changes, Japanese traditional/new-form relationships, and cross-edition source attribution. Preserve uncertainty rather than inventing script dates or conflating inscriptions.
+1. **Post-release visual evaluation:** Inspect real live entries for 討, 牛, 字, 悪/惡, and 学/學 on desktop/mobile. Check classification, image provenance, accessibility, failed-image behavior, and text-only historical forms. This manual review has not been recorded as complete.
+2. **Source and variant reliability:** Improve only when specific evidence shows a gap, especially upstream Wiktionary HTML changes, Japanese traditional/new-form relationships, and cross-edition source attribution. Preserve uncertainty rather than inventing script dates or conflating inscriptions.
 
 ## Known risks and boundaries
 
