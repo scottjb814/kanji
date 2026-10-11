@@ -24,7 +24,6 @@
 | [#2](https://github.com/scottjb814/kanji/pull/2) | Merged | Kanjipedia exact-character matching, entry validation, structured failures, and timeouts |
 | [#3](https://github.com/scottjb814/kanji/pull/3) | Merged | Historical-form discovery across English, Japanese, and Chinese Wiktionary; image identities and source paths |
 | [#4](https://github.com/scottjb814/kanji/pull/4) | Merged | Consolidated gallery, conservative script grouping, Commons/source links, original tables, and partial-result handling |
-
 | [#6](https://github.com/scottjb814/kanji/pull/6) | Merged | Per-image provenance, host-qualified image identities, and reusable attribution |
 | [#7](https://github.com/scottjb814/kanji/pull/7) | Merged | Catalogue character labels and related kyūjitai history in the primary gallery |
 | [#8](https://github.com/scottjb814/kanji/pull/8) | Merged | Lazy-loaded Kouzan brush font with explicit glyph-coverage checks |
