@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <title>Glyph origins</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#A3271F">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='14' fill='%23A3271F'/><text x='50' y='72' font-size='64' text-anchor='middle' fill='white'>字</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -234,6 +237,8 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
 .form.brush .txt { font-size: 52px; line-height: 76px; font-weight: 400; }
 
 .status { padding: 24px 0; color: var(--muted); }
+.app-notice { max-width: 720px; margin: 8px auto; padding: 8px 14px; color: var(--muted); font-size: 14px; }
+.app-notice button { margin-left: 8px; }
 .empty { color: var(--muted); padding: 30px 0; }
 .empty p { margin: 0 0 8px; }
 
@@ -253,6 +258,8 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
   <div id="chars" role="toolbar" aria-label="Characters"></div>
 </header>
 <div id="saved" hidden></div>
+<p id="offline-status" class="app-notice" role="status" hidden>You’re offline. Downloaded readings and meanings remain available. Historical forms, source explanations, and calligraphy fonts need a connection.</p>
+<p id="pwa-status" class="app-notice" role="status" hidden>A new version is ready.<button id="pwa-update" type="button">Update and reload</button></p>
 <main id="out" aria-live="polite">
   <div class="empty">
     <p>Paste a kanji or a compound to see its historical forms and glyph origin from Wiktionary, with the 說文解字 entry where there is one.</p>
@@ -260,6 +267,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
   </div>
 </main>
 <footer>
+  <p id="pwa-ready" hidden>Basic offline data is ready on this device. Historical sources and online fonts still need a connection.</p>
   Readings, meanings and other character data: <a href="https://www.edrdg.org/wiki/index.php/KANJIDIC_Project" target="_blank" rel="noopener">KANJIDIC2</a>,
   property of the <a href="https://www.edrdg.org/" target="_blank" rel="noopener">Electronic Dictionary Research and Development Group</a>,
   used under its <a href="https://www.edrdg.org/edrdg/licence.html" target="_blank" rel="noopener">licence</a> (CC BY-SA 4.0)<span id="kddate"></span>.
@@ -276,6 +284,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
 
 <script src="historical-forms.js"></script>
 <script src="image-provenance.js"></script>
+<script src="pwa.js" defer></script>
 <script>
 (() => {
   "use strict";
@@ -1442,6 +1451,23 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
   }
 
   // ---------- Rendering ----------
+  function renderUnavailable(ch, error) {
+    // A transport failure is not evidence that a source lacks an entry.
+    // Keep a real .kd-slot so late-arriving local readings can still hydrate.
+    const box = el("section", { class: "entry", "data-kanji": ch });
+    box.append(el("div", { class: "head" },
+      el("div", { class: "seal", lang: "ja", text: ch, "aria-hidden": "true" }),
+      el("div", {}, el("h2", {}, ch, el("span", { class: "cp", text: cpOf(ch) })),
+        saveButton(ch), sourceLinks(ch, null))));
+    box.append(el("div", { class: "kd-slot" }, el("p", { class: "muted", text: "Loading downloaded readings and meanings…" })));
+    const retry = el("button", { type: "button", text: "Retry live sources" });
+    retry.addEventListener("click", () => show(ch));
+    box.append(el("p", { class: "muted", text: navigator.onLine === false
+      ? "Historical forms and source explanations need an internet connection."
+      : "Live sources unavailable: " + error.message + ". Downloaded readings are shown when available." }), retry);
+    return box;
+  }
+
   function renderEntry(ch, data, { secondary = false, note = null, kd = null, gallery = true } = {}) {
     const box = el("section", { class: "entry" + (secondary ? " secondary" : ""), lang: "en", "data-kanji": ch });
     const head = el("div", { class: "head" },
@@ -1521,17 +1547,21 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
     // KANJIDIC is supplementary. Render Wiktionary without waiting for its
     // (potentially large) JSON download, and hydrate readings when it arrives.
     let kdData = null;
+    let kdLoaded = false;
     const fillKD = data => {
-      if (id !== reqId || !data) return;
+      if (id !== reqId) return;
       for (const entry of out.querySelectorAll(".entry[data-kanji]")) {
         const c = entry.dataset.kanji;
         const slot = entry.querySelector(".kd-slot");
-        if (slot) slot.replaceChildren(renderKD(data[c] || data[c.normalize("NFC")]));
+        const rec = data && (data[c] || data[c.normalize("NFC")]);
+        if (slot) slot.replaceChildren(rec ? renderKD(rec) :
+          el("p", { class: "muted", text: data ? "No KANJIDIC readings or meanings for this character." : "Local dictionary data unavailable. Connect to download it, then try again." }));
       }
     };
-    loadKD().then(data => { kdData = data; fillKD(data); });
+    loadKD().then(data => { kdLoaded = true; kdData = data; fillKD(data); });
 
     try {
+      if (navigator.onLine === false) throw new Error("Offline");
       const data = await lookup(ch);
       if (id !== reqId) return;
       const nodes = [];
@@ -1547,7 +1577,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
         nodes.push(renderEntry(ch, data));
       }
       out.replaceChildren(...nodes);
-      fillKD(kdData);
+      if (kdLoaded) fillKD(kdData);
 
       if (kyu) {
         const body = el("div", {}, el("p", { class: "muted", text: "Loading traditional-form sources…" }));
@@ -1559,7 +1589,7 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
             const k = await lookup(kyu);
             if (id !== reqId) return;
             body.replaceChildren(renderEntry(kyu, { ...k, kyujitai: null }, { secondary: true, gallery: false }));
-            fillKD(kdData);
+            if (kdLoaded) fillKD(kdData);
           } catch {
             if (id !== reqId) return;
             const retry = el("button", { type: "button", text: "Retry traditional-form sources" });
@@ -1571,10 +1601,8 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
       }
     } catch (e) {
       if (id !== reqId) return;
-      out.replaceChildren(el("div", { class: "status" },
-        el("p", { text: "Couldn't load " + ch + " from Wiktionary: " + e.message + "." }),
-        el("p", {}, "Check your connection, then tap the character again, or ",
-          el("a", { href: wiktUrl(ch), target: "_blank", rel: "noopener", text: "open Wiktionary directly" }), ".")));
+      out.replaceChildren(renderUnavailable(ch, e));
+      if (kdLoaded) fillKD(kdData);
     }
   }
 
@@ -1666,4 +1694,5 @@ button.save[aria-pressed=true] { border-color: var(--seal); box-shadow: inset 0 
 </script>
 </body>
 </html>
+
 

@@ -34,3 +34,18 @@ jobs:
       - name: Test Wiktionary section discovery and image identity
         run: node --test tests/*.spec.mjs
 
+  pwa-browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install test-only browser
+        run: |
+          npm install --no-save --no-package-lock --ignore-scripts playwright@1.55.1
+          npx playwright install --with-deps chromium
+      - name: Test installability, offline readings and updates
+        run: node tests/pwa-smoke.mjs
+
+
