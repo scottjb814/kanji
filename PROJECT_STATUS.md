@@ -47,7 +47,7 @@
 
 ## Next priorities
 
-- **PWA implementation (feature branch; not deployed):** Install manifest and red 字
+- **[PWA PR #11](https://github.com/scottjb814/kanji/pull/11) (feature branch; not deployed):** Install manifest and red 字
   icons; explicit local app/data precache; readable KANJIDIC fallback when live
   sources fail; offline notice; user-triggered update/reload. Historical sources,
   images, online fonts and authenticated Kanjipedia requests remain online-only.

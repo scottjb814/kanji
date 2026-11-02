@@ -48,7 +48,7 @@ try {
   assert.equal(manifest.launch, '/kanji/');
   assert.equal(manifest.display, 'standalone');
   const cdp = await context.newCDPSession(page);
-  const { errors: installErrors } = await cdp.send('Page.getInstallabilityErrors');
+  const { installabilityErrors: installErrors } = await cdp.send('Page.getInstallabilityErrors');
   assert.deepEqual(installErrors, [], 'Chromium installability requirements');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await context.setOffline(true);
