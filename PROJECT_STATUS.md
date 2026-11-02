@@ -9,12 +9,12 @@
 
 ## Production baseline
 
-- **Latest successful GitHub Pages deployment:** `main` commit [`4184e25676abeada5cd63b06d6682c384ef079ad`](https://github.com/scottjb814/kanji/commit/4184e25676abeada5cd63b06d6682c384ef079ad), merged through PR #10 on October 10, 2026.
-- **Pages publication:** [Build and deploy run 38099578679](https://github.com/scottjb814/kanji/actions/runs/38099578679) passed; both build and deploy jobs were checked during this refresh.
-- **Post-merge checks:** [Run 38099578700](https://github.com/scottjb814/kanji/actions/runs/38099578700) passed for the same commit.
-- **Published assets checked:** After the PR #10 deployment, the live HTML returned HTTP 200 and its Other accounts calls were verified in the order KP, JA, ZH, MOE, SW. `historical-forms.js`, `image-provenance.js`, `data/shuowen_index.json`, and deployment-generated `data/kanjidic.json` also returned HTTP 200. No interactive browser check was performed for this release.
-- **Earlier browser evidence:** The previous snapshot records a 390-pixel Chromium test with synthetic Wiktionary responses ([run 37863267835](https://github.com/scottjb814/kanji/actions/runs/37863267835)), covering grouping, deduplication, links, credits, and original tables. This is historical evidence, not a new live-site check.
-- **Cloudflare Worker (prior snapshot; not rechecked):** Deployed separately by the site owner. [Eight token-free live checks](https://github.com/scottjb814/kanji/actions/runs/37864459489) passed (authentication, CORS, and error handling). The site owner subsequently confirmed authenticated Kanjipedia なりたち displayed successfully. Worker source changes in GitHub do **not** automatically deploy to Cloudflare.
+- **Application release:** `main` commit [`322f98bcd22a503085ac04b43285cb9633345402`](https://github.com/scottjb814/kanji/commit/322f98bcd22a503085ac04b43285cb9633345402), merged through [PR #11](https://github.com/scottjb814/kanji/pull/11) on November 2, 2026.
+- **Pages publication:** [Build and deploy run 41514765267](https://github.com/scottjb814/kanji/actions/runs/41514765267) passed; both build and deploy jobs succeeded.
+- **Post-merge checks:** [Run 41514765236](https://github.com/scottjb814/kanji/actions/runs/41514765236) passed for the same commit. PR validation passed 74 Node regressions, 1 Python conversion test, and the real Chromium PWA smoke test using synthetic dictionary data.
+- **Live browser verification:** The published page displayed “Basic offline data is ready on this device,” indicating successful service-worker installation and required local-asset precaching. A real 牛 lookup displayed KANJIDIC readings and meanings, historical forms, and source links. Physical phone installation and offline operation of the production site were not tested; offline launch, saved characters, navigation, missing-data recovery, and update activation were verified in the synthetic Chromium smoke test.
+- **Cloudflare Worker:** Unchanged by this release and deployed separately by the site owner. Prior token-free checks and the owner's authenticated Kanjipedia confirmation remain the latest recorded Worker verification.
+- This status-only refresh follows the application release and triggers another Pages build without changing the application's source assets.
 
 ## Recently completed work
 
@@ -32,11 +32,12 @@
 ## Release and documentation status
 
 - [PR #10](https://github.com/scottjb814/kanji/pull/10) is merged and deployed. Other accounts now appears as Kanjipedia → ja.Wiktionary → zh.Wiktionary → Taiwan MOE → zh.Wikisource (說文解字), preserving independent loading, optional-source flags, retries, and the final link-only dictionary card. Five new DOM regression cases cover ordering, missing entries, multiple Wiktionary blocks, failures/retries, and optional sources. Both PR checks and the post-merge suite passed.
-- [PR #5](https://github.com/scottjb814/kanji/pull/5) introduces this status document. The user authorized its merge together with deployment. The baseline above records the verified application release immediately before this documentation-only merge; the documentation merge triggers another Pages run without changing application assets.
-- No other feature PR was open when this release was checked. Consult the current PR list before starting new work.
+- [PR #5](https://github.com/scottjb814/kanji/pull/5) merged the project-status document on October 10, 2026.
+- [PR #11](https://github.com/scottjb814/kanji/pull/11) merged and deployed the installable app with basic offline readings on November 2, 2026. Installation metadata, icons, scoped local caching, release versioning, offline fallback, and an update/reload action are implemented. Historical sources, images, online fonts, and private Kanjipedia responses remain online-only.
 
 ## Current implementation
 
+- Installable PWA with basic offline interface and KANJIDIC data. The footer confirms the initial download. Browser storage may be cleared or evicted; installation adds no synchronization. All PWA assets are explicitly included in Pages assembly, and a content digest versions each release, including monthly dictionary refreshes.
 - Static, dependency-light GitHub Pages application: `index.html`, `historical-forms.js`, `image-provenance.js`, CSS, and vanilla JavaScript.
 - Live MediaWiki responses from English/Japanese/Chinese Wiktionary; historical forms are deduplicated by hosting-file identity while retaining edition and section attribution. Same-named files on different hosts remain distinct. Source etymologies and original tables remain accessible.
 - Per-image details and copied attribution distinguish digital-file metadata from ancient artifact evidence. Primary galleries include linked kyūjitai sources; catalogue character labels do not establish historical identification.
@@ -47,7 +48,7 @@
 
 ## Next priorities
 
-- **[PWA PR #11](https://github.com/scottjb814/kanji/pull/11) (feature branch; not deployed):** Install manifest and red 字
+- **[PWA PR #11](https://github.com/scottjb814/kanji/pull/11) (merged and deployed):** Install manifest and red 字
   icons; explicit local app/data precache; readable KANJIDIC fallback when live
   sources fail; offline notice; user-triggered update/reload. Historical sources,
   images, online fonts and authenticated Kanjipedia requests remain online-only.
