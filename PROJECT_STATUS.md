@@ -1,6 +1,6 @@
 # Kanji Origins — Project Status
 
-**Last updated:** 2026-10-10 (America/Los_Angeles)  
+**Last updated:** 2026-11-02 (America/Los_Angeles)
 **Repository:** https://github.com/scottjb814/kanji  
 **Live site:** https://scottjb814.github.io/kanji/  
 **Cloudflare Worker:** https://kanji-kp.scottjb814.workers.dev/
@@ -47,6 +47,15 @@
 
 ## Next priorities
 
+- **[PWA PR #11](https://github.com/scottjb814/kanji/pull/11) (feature branch; not deployed):** Install manifest and red 字
+  icons; explicit local app/data precache; readable KANJIDIC fallback when live
+  sources fail; offline notice; user-triggered update/reload. Historical sources,
+  images, online fonts and authenticated Kanjipedia requests remain online-only.
+  Pages assembly hashes the complete output, including monthly dictionary data,
+  into the service-worker version. Deterministic cache tests and a synthetic
+  Chromium smoke test accompany the change. See the PWA PR for current CI results.
+  No app-store packaging, synchronization, or full offline research is included.
+
 1. **Post-release visual evaluation:** Inspect real live entries for 討, 牛, 字, 悪/惡, and 学/學 on desktop/mobile. Check classification, image provenance, accessibility, failed-image behavior, and text-only historical forms. This manual review has not been recorded as complete.
 2. **Source and variant reliability:** Improve only when specific evidence shows a gap, especially upstream Wiktionary HTML changes, Japanese traditional/new-form relationships, and cross-edition source attribution. Preserve uncertainty rather than inventing script dates or conflating inscriptions.
 
@@ -72,3 +81,4 @@
 ## Updating this file
 
 After a significant development phase, update the date, production commit, exact verification evidence, merged/open PRs, completed work, new decisions, and current priorities. Remove stale priorities rather than accumulating a long narrative. Keep detailed procedures in `README.md` and permanent principles in the ChatGPT Project Instructions.
+

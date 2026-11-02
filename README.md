@@ -2,6 +2,47 @@
 
 Personal research site: https://scottjb814.github.io/kanji/
 
+## Installable app and basic offline support
+
+Open the site in a supporting browser and choose its **Install app** or **Add to
+Home Screen** command. The manifest supplies a standalone app window and red 字
+icons. The website continues to work in ordinary browser tabs.
+
+After the footer reports **Basic offline data is ready**, the interface,
+KANJIDIC readings/meanings, and 說文解字 index are cached on that device. The index
+alone does not contain the 說文解字 text. Saved characters remain browser-local;
+installation adds no account or synchronization. Offline launch requires a prior
+successful online download, and browser storage can be cleared or evicted.
+
+Historical images, live source explanations, Wikimedia attribution metadata,
+external fonts, and authenticated Kanjipedia responses are not stored by the
+service worker. Calligraphy is not guaranteed offline. When a live lookup fails,
+local readings remain visible, with a retry button and an explicit explanation.
+Failure to retrieve a source is never presented as proof that its entry is missing.
+
+The worker is scoped to this application's directory. It precaches an explicit
+list of local files and bypasses private, authenticated, no-store, and external
+requests. It serves a coherent cached release; a new release offers **Update and
+reload**. Closing all app tabs also allows a waiting update to activate normally.
+`scripts/build_pwa.mjs` stamps `sw.js` with a digest of the assembled assets,
+including generated KANJIDIC data, so scheduled dictionary refreshes also update
+installed apps. Run it only on the assembled output, not the repository source.
+The Pages workflow copies the manifest, worker, client code and icons explicitly.
+
+Fast deterministic regressions run with `node --test tests/pwa.test.mjs`. The
+PR checks also run a targeted Chromium smoke test with synthetic dictionary data:
+
+    npm install --no-save --no-package-lock --ignore-scripts playwright@1.55.1
+    npx playwright install chromium
+    node tests/pwa-smoke.mjs
+
+This checks the `/kanji/` base path, Chromium installation criteria, offline
+launch and query navigation, saved characters, missing data and recovery,
+390-pixel layout, and service-worker updates. It does not install an app through
+the operating system or test every mobile browser. The optional Windows helper
+`scripts/build_pwa_icons.ps1` rebuilds the committed PNG icons using Yu Mincho;
+normal builds need no image-generation dependencies.
+
 ## Architecture
 GitHub Pages hosts plain HTML, CSS, and JavaScript (index.html). No LLM API or frontend framework is required.
 
@@ -136,3 +177,4 @@ The expandable modern brush section includes 衡山毛筆フォント by 青柳�
 To regenerate: download the official TrueType archive linked in those notes, install `fonttools` and `brotli`, then run `python scripts/build_kouzan_font.py /path/to/KouzanMouhitu.ttf`. This preserves original outlines while removing malformed legacy rendering metadata. The script verifies each generated chunk's coverage and outlines. Run `node --test tests/kouzan.test.mjs` afterward.
 
 The brush tiles are ordered Klee One → Yuji Boku → Kouzan Brush → Liu Jian Mao Cao, keeping a readable Japanese reference on the left. Yuji Boku replaces LXGW WenKai TC and is served through Google Fonts under SIL OFL 1.1. Its verified bitmap covers 6,835 nonblank Han glyphs; source metadata and terms are in `fonts/yuji-boku/`. The order is a reading aid, not a formal script-development chronology.
+
